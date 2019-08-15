@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
+	"runtime"
 	"text/template"
 
 	libvirt "github.com/libvirt/libvirt-go"
@@ -46,22 +47,24 @@ const domainTmpl = `
   </features>
   <cpu mode='host-passthrough'/>
   <os>
-    <type>hvm</type>
-    <boot dev='cdrom'/>
-    <boot dev='hd'/>
+    <type arch='{{.Platform}}' machine='{{.PlatformMachine}}'>{{.VirtualizationType}}</type>
     <bootmenu enable='no'/>
   </os>
   <devices>
     <disk type='file' device='cdrom'>
       <source file='{{.ISO}}'/>
-      <target dev='hdc' bus='scsi'/>
+      <target dev='sda' bus='scsi'/>
       <readonly/>
+      <boot order='1'/>
     </disk>
     <disk type='file' device='disk'>
       <driver name='qemu' type='raw' cache='default' io='threads' />
       <source file='{{.DiskPath}}'/>
-      <target dev='hda' bus='virtio'/>
+      <target dev='vda' bus='virtio'/>
+      <boot order='2'/>
     </disk>
+    <input type='keyboard' bus='virtio'></input>
+    <input type='mouse' bus='virtio'></input>
     <interface type='network'>
       <source network='{{.Network}}'/>
       <mac address='{{.MAC}}'/>
@@ -75,6 +78,9 @@ const domainTmpl = `
     <serial type='pty'>
       <target port='0'/>
     </serial>
+    <controller type="scsi" index="0" model="virtio-scsi">
+      <alias name="scsi0"/>
+    </controller>
     <console type='pty'>
       <target type='serial' port='0'/>
     </console>
@@ -159,18 +165,27 @@ func (d *Driver) createDomain() (*libvirt.Domain, error) {
 		d.PrivateMAC = mac.String()
 	}
 
-	// create the XML for the domain using our domainTmpl template
-	tmpl := template.Must(template.New("domain").Parse(domainTmpl))
-	var domainXML bytes.Buffer
-	if err := tmpl.Execute(&domainXML, d); err != nil {
-		return nil, errors.Wrap(err, "executing domain xml")
+	if runtime.GOARCH == "amd64" {
+		d.Platform = "x86_64"
+		d.PlatformMachine = "q35"
+	} else if runtime.GOARCH == "arm64" {
+		d.Platform = "aarch64"
+		d.PlatformMachine = "virt"
 	}
+	d.VirtualizationType = "hvm"
 
 	conn, err := getConnection(d.ConnectionURI)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting libvirt connection")
 	}
 	defer conn.Close()
+
+	// create the XML for the domain using our domainTmpl template
+	tmpl := template.Must(template.New("domain").Parse(domainTmpl))
+	var domainXML bytes.Buffer
+	if err := tmpl.Execute(&domainXML, d); err != nil {
+		return nil, errors.Wrap(err, "executing domain xml")
+	}
 
 	// define the domain in libvirt using the generated XML
 	dom, err := conn.DomainDefineXML(domainXML.String())
