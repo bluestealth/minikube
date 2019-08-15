@@ -38,6 +38,15 @@ type Driver struct {
 	*drivers.BaseDriver
 	*pkgdrivers.CommonDriver
 
+	// What Type of Virtualization to Use
+	VirtualizationType string
+
+	// What CPU Platform is being emulated
+	Platform string
+
+	// What CPU Platform Machine type is being used
+	PlatformMachine string
+
 	// How much memory, in MB, to allocate to the VM
 	Memory int
 
