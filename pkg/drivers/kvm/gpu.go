@@ -41,7 +41,7 @@ const devicesTmpl = `
   <image compression='off'/>
 </graphics>
 <video>
-  <model type='cirrus' vram='16384' heads='1' primary='yes'/>
+  <model type='virtio' vram='16384' heads='1' primary='yes'/>
 </video>
 {{range .}}
 <hostdev mode='subsystem' type='pci' managed='yes'>
