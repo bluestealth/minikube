@@ -44,6 +44,9 @@ type Driver struct {
 	// What CPU Platform is being emulated
 	Platform string
 
+	// What CPU Platform type is being used
+	PlatformType string
+
 	// What CPU Platform Machine type is being used
 	PlatformMachine string
 
