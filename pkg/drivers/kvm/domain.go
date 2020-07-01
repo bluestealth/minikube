@@ -23,7 +23,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net"
-	"runtime"
 	"text/template"
 
 	libvirt "github.com/libvirt/libvirt-go"
@@ -31,9 +30,9 @@ import (
 )
 
 const domainTmpl = `
-<domain type='kvm'>
+<domain type='{{.VirtualizationType}}'>
   <name>{{.MachineName}}</name>
-  <memory unit='MB'>{{.Memory}}</memory>
+  <memory unit='MiB'>{{.Memory}}</memory>
   <vcpu>{{.CPU}}</vcpu>
   <features>
     <acpi/>
@@ -47,7 +46,7 @@ const domainTmpl = `
   </features>
   <cpu mode='host-passthrough'/>
   <os>
-    <type arch='{{.Platform}}' machine='{{.PlatformMachine}}'>{{.VirtualizationType}}</type>
+    <type arch='{{.Platform}}' machine='{{.PlatformMachine}}'>{{.PlatformType}}</type>
     <bootmenu enable='no'/>
   </os>
   <devices>
@@ -165,20 +164,20 @@ func (d *Driver) createDomain() (*libvirt.Domain, error) {
 		d.PrivateMAC = mac.String()
 	}
 
-	if runtime.GOARCH == "amd64" {
-		d.Platform = "x86_64"
-		d.PlatformMachine = "q35"
-	} else if runtime.GOARCH == "arm64" {
-		d.Platform = "aarch64"
-		d.PlatformMachine = "virt"
-	}
-	d.VirtualizationType = "hvm"
-
 	conn, err := getConnection(d.ConnectionURI)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting libvirt connection")
 	}
 	defer conn.Close()
+
+	capabilities, err := GetHostCapabilities(conn)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting host capabilities")
+	}
+	d.Platform = capabilities.GetHostArch()
+	d.PlatformType = capabilities.GetPlatformOSType(d.Platform)
+	d.PlatformMachine = capabilities.GetPlatformMachine(d.Platform)
+	d.VirtualizationType = capabilities.GetVirtualizationType(d.Platform)
 
 	// create the XML for the domain using our domainTmpl template
 	tmpl := template.Must(template.New("domain").Parse(domainTmpl))
