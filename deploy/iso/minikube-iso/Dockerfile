@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
-RUN apt-get update \
+ENV DEBIAN_FRONTEND noninteractive
+RUN ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime
+RUN printf "Etc/UTC\n" > /etc/timezone
+RUN	apt-get update \
 	&& apt-get install -y apt dpkg apt-utils ca-certificates \
 	&& apt-get upgrade -y \
 	&& apt-get install -y \
@@ -36,7 +39,6 @@ RUN apt-get update \
 		golang-go \
 		libpcre3-dev \
 	&& rm -rf /var/lib/apt/lists/*
-
 RUN localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 ENV LANG en_US.utf8
 
