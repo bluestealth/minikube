@@ -81,8 +81,10 @@ BUILD_DIR ?= ./out
 $(shell mkdir -p $(BUILD_DIR))
 CURRENT_GIT_BRANCH ?= $(shell git branch | grep \* | cut -d ' ' -f2)
 
+# container client to use
+DOCKER ?= docker
 # Use system python if it exists, otherwise use Docker.
-PYTHON := $(shell command -v python || echo "docker run --rm -it -v $(shell pwd):/minikube -w /minikube python python")
+PYTHON := $(shell command -v python || echo "$(DOCKER) run --rm -it -v $(shell pwd):/minikube -w /minikube python python")
 BUILD_OS := $(shell uname -s)
 
 SHA512SUM=$(shell command -v sha512sum || echo "shasum -a 512")
@@ -144,9 +146,9 @@ define user_confirm
 	fi
 endef
 
-# $(call DOCKER, image, command)
-define DOCKER
-	docker run --rm -e GOCACHE=/app/.cache -e IN_DOCKER=1 --user $(shell id -u):$(shell id -g) -w /app -v $(PWD):/app -v $(GOPATH):/go --init $(1) /bin/bash -c '$(2)'
+# $(call DOCKER_CMD, image, command)
+define DOCKER_CMD
+	$(DOCKER) run --rm -e GOCACHE=/app/.cache -e IN_DOCKER=1 --user $(shell id -u):$(shell id -g) -w /app -v $(PWD):/app -v $(GOPATH):/go --init $(1) /bin/bash -c '$(2)'
 endef
 
 ifeq ($(BUILD_IN_DOCKER),y)
@@ -183,7 +185,7 @@ endif
 
 out/minikube$(IS_EXE): $(SOURCE_GENERATED) $(SOURCE_FILES) go.mod
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	$(call DOCKER,$(BUILD_IMAGE),GOOS=$(GOOS) GOARCH=$(GOARCH) /usr/bin/make $@)
+	$(call DOCKER_CMD,$(BUILD_IMAGE),GOOS=$(GOOS) GOARCH=$(GOARCH) /usr/bin/make $@)
 else
 	$(if $(quiet),@echo "  GO       $@")
 	$(Q)go build $(MINIKUBE_GOFLAGS) -tags "$(MINIKUBE_BUILD_TAGS)" -ldflags="$(MINIKUBE_LDFLAGS)" -o $@ k8s.io/minikube/cmd/minikube
@@ -209,7 +211,7 @@ minikube-windows-amd64.exe: out/minikube-windows-amd64.exe ## Build Minikube for
 
 out/minikube-%: $(SOURCE_GENERATED) $(SOURCE_FILES)
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	$(call DOCKER,$(BUILD_IMAGE),/usr/bin/make $@)
+	$(call DOCKER_CMD,$(BUILD_IMAGE),/usr/bin/make $@)
 else
 	$(if $(quiet),@echo "  GO       $@")
 	$(Q)GOOS="$(firstword $(subst -, ,$*))" GOARCH="$(lastword $(subst -, ,$(subst $(IS_EXE), ,$*)))" \
@@ -257,13 +259,13 @@ out/minikube.iso: $(shell find "deploy/iso/minikube-iso" -type f)
 ifeq ($(IN_DOCKER),1)
 	$(MAKE) minikube_iso
 else
-	docker run --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
+	$(DOCKER) run --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
 		--user $(shell id -u):$(shell id -g) --env HOME=/tmp --env IN_DOCKER=1 \
 		$(ISO_BUILD_IMAGE) /usr/bin/make out/minikube.iso
 endif
 
 iso_in_docker:
-	docker run -it --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
+	$(DOCKER) run -it --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
 		--user $(shell id -u):$(shell id -g) --env HOME=/tmp --env IN_DOCKER=1 \
 		$(ISO_BUILD_IMAGE) /bin/bash
 
@@ -340,7 +342,7 @@ extract: ## Compile extract tool
 # Regenerates assets.go when template files have been updated
 pkg/minikube/assets/assets.go: $(shell find "deploy/addons" -type f)
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	$(call DOCKER,$(BUILD_IMAGE),/usr/bin/make $@)
+	$(call DOCKER_CMD,$(BUILD_IMAGE),/usr/bin/make $@)
 endif
 	@which go-bindata >/dev/null 2>&1 || GO111MODULE=off GOBIN="$(GOPATH)$(DIRSEP)bin" go get github.com/go-bindata/go-bindata/...
 	$(if $(quiet),@echo "  GEN      $@")
@@ -353,7 +355,7 @@ endif
 
 pkg/minikube/translate/translations.go: $(shell find "translations/" -type f)
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	$(call DOCKER,$(BUILD_IMAGE),/usr/bin/make $@)
+	$(call DOCKER_CMD,$(BUILD_IMAGE),/usr/bin/make $@)
 endif
 	@which go-bindata >/dev/null 2>&1 || GO111MODULE=off GOBIN="$(GOPATH)$(DIRSEP)bin" go get github.com/go-bindata/go-bindata/...
 	$(if $(quiet),@echo "  GEN      $@")
@@ -431,7 +433,7 @@ out/linters/golangci-lint-$(GOLINT_VERSION):
 .PHONY: lint
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
 lint: pkg/minikube/assets/assets.go pkg/minikube/translate/translations.go
-	docker run --rm -v $(pwd):/app -w /app golangci/golangci-lint:$(GOLINT_VERSION) \
+	$(DOCKER) run --rm -v $(pwd):/app -w /app golangci/golangci-lint:$(GOLINT_VERSION) \
 	golangci-lint run ${GOLINT_OPTIONS} --skip-dirs "cmd/drivers/kvm|cmd/drivers/hyperkit|pkg/drivers/kvm|pkg/drivers/hyperkit" ./...
 else
 lint: pkg/minikube/assets/assets.go pkg/minikube/translate/translations.go out/linters/golangci-lint-$(GOLINT_VERSION) ## Run lint
@@ -539,7 +541,7 @@ out/minikube-installer.exe: out/minikube-windows-amd64.exe
 
 out/docker-machine-driver-hyperkit:
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	docker run --rm -e GOCACHE=/app/.cache -e IN_DOCKER=1 \
+	$(DOCKER) run --rm -e GOCACHE=/app/.cache -e IN_DOCKER=1 \
 		--user $(shell id -u):$(shell id -g) -w /app \
 		-v $(PWD):/app -v $(GOPATH):/go --init --entrypoint "" \
 		$(HYPERKIT_BUILD_IMAGE) /bin/bash -c 'CC=o64-clang CXX=o64-clang++ /usr/bin/make $@'
@@ -572,7 +574,7 @@ check-release: ## Execute go test
 
 buildroot-image: $(ISO_BUILD_IMAGE) # convenient alias to build the docker container
 $(ISO_BUILD_IMAGE): deploy/iso/minikube-iso/Dockerfile
-	docker build $(ISO_DOCKER_EXTRA_ARGS) -t $@ -f $< $(dir $<)
+	$(DOCKER) build $(ISO_DOCKER_EXTRA_ARGS) -t $@ -f $< $(dir $<)
 	@echo ""
 	@echo "$(@) successfully built"
 
@@ -582,7 +584,7 @@ out/storage-provisioner: out/storage-provisioner-$(GOARCH)
 
 out/storage-provisioner-%: cmd/storage-provisioner/main.go pkg/storage/storage_provisioner.go
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	$(call DOCKER,$(BUILD_IMAGE),/usr/bin/make $@)
+	$(call DOCKER_CMD,$(BUILD_IMAGE),/usr/bin/make $@)
 else
 	$(if $(quiet),@echo "  GO       $@")
 	$(Q)CGO_ENABLED=0 GOOS=linux GOARCH=$* go build -o $@ -ldflags=$(PROVISIONER_LDFLAGS) cmd/storage-provisioner/main.go
@@ -590,16 +592,16 @@ endif
 
 .PHONY: storage-provisioner-image
 storage-provisioner-image: storage-provisioner-image-$(GOARCH) ## Build storage-provisioner docker image
-	docker tag $(REGISTRY)/storage-provisioner-$(GOARCH):$(STORAGE_PROVISIONER_TAG) $(REGISTRY)/storage-provisioner:$(STORAGE_PROVISIONER_TAG)
+	$(DOCKER) tag $(REGISTRY)/storage-provisioner-$(GOARCH):$(STORAGE_PROVISIONER_TAG) $(REGISTRY)/storage-provisioner:$(STORAGE_PROVISIONER_TAG)
 
 storage-provisioner-image-%: out/storage-provisioner-%
-	docker build -t $(REGISTRY)/storage-provisioner-$*:$(STORAGE_PROVISIONER_TAG) -f deploy/storage-provisioner/Dockerfile  --build-arg arch=$* .
+	$(DOCKER) build -t $(REGISTRY)/storage-provisioner-$*:$(STORAGE_PROVISIONER_TAG) -f deploy/storage-provisioner/Dockerfile  --build-arg arch=$* .
 
 .PHONY: kic-base-image
 kic-base-image: ## builds the kic base image and tags local/kicbase:latest and local/kicbase:$(KIC_VERSION)-$(COMMIT_SHORT)
-	docker build -f ./deploy/kicbase/Dockerfile -t local/kicbase:$(KIC_VERSION)  --build-arg COMMIT_SHA=${VERSION}-$(COMMIT) --cache-from $(KIC_BASE_IMAGE_GCR) ./deploy/kicbase
-	docker tag local/kicbase:$(KIC_VERSION) local/kicbase:latest
-	docker tag local/kicbase:$(KIC_VERSION) local/kicbase:$(KIC_VERSION)-$(COMMIT_SHORT)
+	$(DOCKER) build -f ./deploy/kicbase/Dockerfile -t local/kicbase:$(KIC_VERSION)  --build-arg COMMIT_SHA=${VERSION}-$(COMMIT) --cache-from $(KIC_BASE_IMAGE_GCR) ./deploy/kicbase
+	$(DOCKER) tag local/kicbase:$(KIC_VERSION) local/kicbase:latest
+	$(DOCKER) tag local/kicbase:$(KIC_VERSION) local/kicbase:$(KIC_VERSION)-$(COMMIT_SHORT)
 
 # multi-arch docker images
 X_DOCKER_BUILDER ?= minikube-builder
@@ -635,7 +637,7 @@ upload-preloaded-images-tar: out/minikube # Upload the preloaded images for olde
 
 .PHONY: push-storage-provisioner-image
 push-storage-provisioner-image: storage-provisioner-image ## Push storage-provisioner docker image using gcloud
-	docker login gcr.io/k8s-minikube
+	$(DOCKER) login gcr.io/k8s-minikube
 	$(MAKE) push-docker IMAGE=$(STORAGE_PROVISIONER_IMAGE)
 
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
@@ -644,36 +646,36 @@ TAG = $(STORAGE_PROVISIONER_TAG)
 
 .PHONY: push-storage-provisioner-manifest
 push-storage-provisioner-manifest: $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~storage\-provisioner\-image\-&~g")
-	docker login gcr.io/k8s-minikube
+	$(DOCKER) login gcr.io/k8s-minikube
 	set -x; for arch in $(ALL_ARCH); do docker push ${IMAGE}-$${arch}:${TAG}; done
-	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
+	$(DOCKER) manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
 	set -x; for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
-	docker manifest push $(STORAGE_PROVISIONER_MANIFEST)
+	$(DOCKER) manifest push $(STORAGE_PROVISIONER_MANIFEST)
 
 .PHONY: push-docker
 push-docker: # Push docker image base on to IMAGE variable (used internally by other targets)
-	@docker pull $(IMAGE) && echo "Image already exist in registry" && exit 1 || echo "Image doesn't exist in registry"
+	@$(DOCKER) pull $(IMAGE) && echo "Image already exist in registry" && exit 1 || echo "Image doesn't exist in registry"
 ifndef AUTOPUSH
 	$(call user_confirm, 'Are you sure you want to push $(IMAGE) ?')
 endif
-	docker push $(IMAGE)
+	$(DOCKER) push $(IMAGE)
 
 .PHONY: push-kic-base-image-gcr
 push-kic-base-image-gcr: kic-base-image ## Push kic-base to gcr
-	docker login gcr.io/k8s-minikube
-	docker tag local/kicbase:latest $(KIC_BASE_IMAGE_GCR)
+	$(DOCKER) login gcr.io/k8s-minikube
+	$(DOCKER) tag local/kicbase:latest $(KIC_BASE_IMAGE_GCR)
 	$(MAKE) push-docker IMAGE=$(KIC_BASE_IMAGE_GCR)
 
 .PHONY: push-kic-base-image-gh
 push-kic-base-image-gh: kic-base-image ## Push kic-base to github
-	docker login docker.pkg.github.com
-	docker tag local/kicbase:latest $(KIC_BASE_IMAGE_GH)
+	$(DOCKER) login docker.pkg.github.com
+	$(DOCKER) tag local/kicbase:latest $(KIC_BASE_IMAGE_GH)
 	$(MAKE) push-docker IMAGE=$(KIC_BASE_IMAGE_GH)
 
 .PHONY: push-kic-base-image-hub
 push-kic-base-image-hub: kic-base-image ## Push kic-base to docker hub
-	docker login
-	docker tag local/kicbase:latest $(KIC_BASE_IMAGE_HUB)
+	$(DOCKER) login
+	$(DOCKER) tag local/kicbase:latest $(KIC_BASE_IMAGE_HUB)
 	$(MAKE) push-docker IMAGE=$(KIC_BASE_IMAGE_HUB)
 
 .PHONY: push-kic-base-image-x86-deprecated
@@ -692,11 +694,11 @@ out/gvisor-addon: pkg/minikube/assets/assets.go pkg/minikube/translate/translati
 
 .PHONY: gvisor-addon-image
 gvisor-addon-image: out/gvisor-addon  ## Build docker image for gvisor
-	docker build -t $(REGISTRY)/gvisor-addon:$(GVISOR_TAG) -f deploy/gvisor/Dockerfile .
+	$(DOCKER) build -t $(REGISTRY)/gvisor-addon:$(GVISOR_TAG) -f deploy/gvisor/Dockerfile .
 
 .PHONY: push-gvisor-addon-image
 push-gvisor-addon-image: gvisor-addon-image
-	docker login gcr.io/k8s-minikube
+	$(DOCKER) login gcr.io/k8s-minikube
 	$(MAKE) push-docker IMAGE=$(REGISTRY)/gvisor-addon:$(GVISOR_TAG)
 
 .PHONY: release-iso
@@ -723,8 +725,8 @@ out/docker-machine-driver-kvm2-aarch64: out/docker-machine-driver-kvm2-arm64
 
 out/docker-machine-driver-kvm2-%:
 ifeq ($(MINIKUBE_BUILD_IN_DOCKER),y)
-	docker image inspect -f '{{.Id}} {{.RepoTags}}' $(KVM_BUILD_IMAGE) || $(MAKE) kvm-image
-	$(call DOCKER,$(KVM_BUILD_IMAGE),/usr/bin/make $@ COMMIT=$(COMMIT))
+	$(DOCKER) image inspect -f '{{.Id}} {{.RepoTags}}' $(KVM_BUILD_IMAGE) || $(MAKE) kvm-image
+	$(call DOCKER_CMD,$(KVM_BUILD_IMAGE),/usr/bin/make $@ COMMIT=$(COMMIT))
 	# make extra sure that we are linking with the older version of libvirt (1.3.1)
 	test "`strings $@ | grep '^LIBVIRT_[0-9]' | sort | tail -n 1`" = "LIBVIRT_1.2.9"
 else
@@ -766,14 +768,14 @@ out/docker-machine-driver-kvm2-$(RPM_VERSION)-0.%.rpm: out/docker-machine-driver
 
 .PHONY: kvm-image
 kvm-image: installers/linux/kvm/Dockerfile  ## Convenient alias to build the docker container
-	docker build --build-arg "GO_VERSION=$(GO_VERSION)" -t $(KVM_BUILD_IMAGE) -f $< $(dir $<)
+	$(DOCKER) build --build-arg "GO_VERSION=$(GO_VERSION)" -t $(KVM_BUILD_IMAGE) -f $< $(dir $<)
 	@echo ""
 	@echo "$(@) successfully built"
 
 kvm_in_docker:
-	docker image inspect -f '{{.Id}} {{.RepoTags}}' $(KVM_BUILD_IMAGE) || $(MAKE) kvm-image
+	$(DOCKER) image inspect -f '{{.Id}} {{.RepoTags}}' $(KVM_BUILD_IMAGE) || $(MAKE) kvm-image
 	rm -f out/docker-machine-driver-kvm2
-	$(call DOCKER,$(KVM_BUILD_IMAGE),/usr/bin/make out/docker-machine-driver-kvm2 COMMIT=$(COMMIT))
+	$(call DOCKER_CMD,$(KVM_BUILD_IMAGE),/usr/bin/make out/docker-machine-driver-kvm2 COMMIT=$(COMMIT))
 
 .PHONY: install-kvm-driver
 install-kvm-driver: out/docker-machine-driver-kvm2  ## Install KVM Driver
