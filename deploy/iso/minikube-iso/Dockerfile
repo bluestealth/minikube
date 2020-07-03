@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
+RUN ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime
+RUN printf "Etc/UTC\n" > /etc/timezone
 RUN apt-get update \
 	&& apt-get install -y apt dpkg apt-utils ca-certificates \
 	&& apt-get upgrade -y \
