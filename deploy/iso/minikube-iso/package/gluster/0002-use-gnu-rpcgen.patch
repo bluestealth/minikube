@@ -1,6 +1,6 @@
-diff -ru gluster-4.1.5/rpc/xdr/gen/Makefile.am gluster-4.1.5.patched/rpc/xdr/gen/Makefile.am
---- gluster-4.1.5/rpc/xdr/gen/Makefile.am	2018-09-21 16:13:45.958611272 +0200
-+++ gluster-4.1.5.patched/rpc/xdr/gen/Makefile.am	2018-09-24 19:50:32.798967652 +0200
+diff -ru gluster-4.1.5/rpc/xdr/src/Makefile.am gluster-4.1.5.patched/rpc/xdr/src/Makefile.am
+--- gluster-4.1.5/rpc/xdr/src/Makefile.am	2018-09-21 16:13:45.958611272 +0200
++++ gluster-4.1.5.patched/rpc/xdr/src/Makefile.am	2018-09-24 19:50:32.798967652 +0200
 @@ -19,14 +19,14 @@
  # in the build. Or we do this crufty thing instead.
  $(XDRSOURCES): $(XDRGENFILES)
@@ -18,10 +18,10 @@ diff -ru gluster-4.1.5/rpc/xdr/gen/Makefile.am gluster-4.1.5.patched/rpc/xdr/gen
  		sed -e '/#ifndef/ s/-/_/g' -e '/#define/ s/-/_/g' \
  			-e '/#endif/ s/-/_/' -e 's/TMP_/H_/g' \
  			$(@:.h=.tmp) > $(xdrdst)/$@ && \
-Only in gluster-4.1.5.patched/rpc/xdr/gen: Makefile.am~
-diff -ru gluster-4.1.5/rpc/xdr/gen/Makefile.in gluster-4.1.5.patched/rpc/xdr/gen/Makefile.in
---- gluster-4.1.5/rpc/xdr/gen/Makefile.in	2018-09-21 16:13:56.087638030 +0200
-+++ gluster-4.1.5.patched/rpc/xdr/gen/Makefile.in	2018-09-24 19:51:06.198109046 +0200
+Only in gluster-4.1.5.patched/rpc/xdr/src: Makefile.am~
+diff -ru gluster-4.1.5/rpc/xdr/src/Makefile.in gluster-4.1.5.patched/rpc/xdr/src/Makefile.in
+--- gluster-4.1.5/rpc/xdr/src/Makefile.in	2018-09-21 16:13:56.087638030 +0200
++++ gluster-4.1.5.patched/rpc/xdr/src/Makefile.in	2018-09-24 19:51:06.198109046 +0200
 @@ -558,14 +558,14 @@
  # in the build. Or we do this crufty thing instead.
  $(XDRSOURCES): $(XDRGENFILES)
@@ -39,4 +39,4 @@ diff -ru gluster-4.1.5/rpc/xdr/gen/Makefile.in gluster-4.1.5.patched/rpc/xdr/gen
  		sed -e '/#ifndef/ s/-/_/g' -e '/#define/ s/-/_/g' \
  			-e '/#endif/ s/-/_/' -e 's/TMP_/H_/g' \
  			$(@:.h=.tmp) > $(xdrdst)/$@ && \
-Only in gluster-4.1.5.patched/rpc/xdr/gen: Makefile.in~
+Only in gluster-4.1.5.patched/rpc/xdr/src: Makefile.in~
