@@ -1,0 +1,36 @@
+diff -Naur glusterfs-7.6/configure glusterfs-7.6-patched/configure
+--- glusterfs-7.6/configure	2020-07-01 22:14:58.724937061 +0000
++++ glusterfs-7.6-patched/configure	2020-07-01 22:41:54.558365378 +0000
+@@ -12260,31 +12260,7 @@
+   with_ipv6_default="no"
+ fi
+ 
+-
+-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for /etc/centos-release" >&5
+-$as_echo_n "checking for /etc/centos-release... " >&6; }
+-if ${ac_cv_file__etc_centos_release+:} false; then :
+-  $as_echo_n "(cached) " >&6
+-else
+-  test "$cross_compiling" = yes &&
+-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+-if test -r "/etc/centos-release"; then
+-  ac_cv_file__etc_centos_release=yes
+-else
+-  ac_cv_file__etc_centos_release=no
+-fi
+-fi
+-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_file__etc_centos_release" >&5
+-$as_echo "$ac_cv_file__etc_centos_release" >&6; }
+-if test "x$ac_cv_file__etc_centos_release" = xyes; then :
+-
+-fi
+-
+-if test "x$ac_cv_file__etc_centos_release" = "xyes"; then
+-        if grep "release 6" /etc/centos-release; then
+-                with_ipv6_default="no"
+-        fi
+-fi
++ac_cv_file__etc_centos_release=no
+ 
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+ $as_echo_n "checking for dlopen in -ldl... " >&6; }
