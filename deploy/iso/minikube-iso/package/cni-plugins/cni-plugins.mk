@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-CNI_PLUGINS_VERSION = v0.8.5
+CNI_PLUGINS_VERSION = v0.9.0
 CNI_PLUGINS_SITE = https://github.com/containernetworking/plugins/archive
 CNI_PLUGINS_SOURCE = $(CNI_PLUGINS_VERSION).tar.gz
 CNI_PLUGINS_LICENSE = Apache-2.0
@@ -12,17 +12,30 @@ CNI_PLUGINS_LICENSE_FILES = LICENSE
 
 CNI_PLUGINS_DEPENDENCIES = host-go
 
-CNI_PLUGINS_MAKE_ENV = \
-	$(GO_TARGET_ENV) \
+CNI_PLUGINS_GO_ENV = \
 	CGO_ENABLED=0 \
-	GO111MODULE=off
+	GO111MODULE=on
 
-CNI_PLUGINS_BUILDFLAGS = -a -ldflags '-extldflags -static -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=$(CNI_PLUGINS_VERSION)'
+CNI_PLUGINS_BUILD_OPTS = -mod=vendor
 
+CNI_PLUGINS_LDFLAGS = -extldflags -static -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=$(CNI_PLUGINS_VERSION)
 
-define CNI_PLUGINS_BUILD_CMDS
-	(cd $(@D); $(CNI_PLUGINS_MAKE_ENV) ./build_linux.sh $(CNI_PLUGINS_BUILDFLAGS))
-endef
+CNI_PLUGINS_BUILD_TARGETS = \
+	plugins/main/bridge \
+	plugins/main/host-device \
+	plugins/main/ipvlan \
+	plugins/main/loopback \
+	plugins/main/macvlan \
+	plugins/main/ptp \
+	plugins/main/vlan \
+	plugins/ipam/dhcp \
+	plugins/ipam/host-local \
+	plugins/meta/bandwidth \
+	plugins/meta/firewall \
+	plugins/meta/flannel \
+	plugins/meta/portmap \
+	plugins/meta/tuning \
+	plugins/meta/vrf
 
 define CNI_PLUGINS_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 \
@@ -129,6 +142,14 @@ define CNI_PLUGINS_INSTALL_TARGET_CMDS
 	ln -sf \
 		../../opt/cni/bin/firewall \
 		$(TARGET_DIR)/usr/bin/firewall
+
+	$(INSTALL) -D -m 0755 \
+		$(@D)/bin/vrf \
+		$(TARGET_DIR)/opt/cni/bin/vrf
+
+	ln -sf \
+		../../opt/cni/bin/vrf \
+		$(TARGET_DIR)/usr/bin/vrf
 endef
 
-$(eval $(generic-package))
+$(eval $(golang-package))
