@@ -250,16 +250,22 @@ iso-menuconfig: ## Configure buildroot configuration
 # Change the kernel configuration for the minikube ISO
 .PHONY: linux-menuconfig
 linux-menuconfig:  ## Configure Linux kernel configuration
+ifeq ($(GOARCH),amd64)
 	$(MAKE) -C $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/ ARCH=x86_64 menuconfig
 	$(MAKE) -C $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/ ARCH=x86_64 savedefconfig
 	cp $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/coreos/minikube/linux_defconfig
+else
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=$(GOARCH) menuconfig
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=$(GOARCH) savedefconfig
+	cp $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/coreos-$(GOARCH)/minikube/linux_defconfig
+endif
 
 minikube_img:
 ifeq ($(GOARCH),amd64)
 	echo $(ISO_VERSION) > deploy/iso/minikube-iso/board/coreos/minikube/rootfs-overlay/etc/VERSION
 endif
 ifeq ($(GOARCH),arm64)
-	echo $(ISO_VERSION) > deploy/iso/minikube-iso/board/aarch64-efi/minikube/rootfs-overlay/etc/VERSION
+	echo $(ISO_VERSION) > deploy/iso/minikube-iso/board/coreos-arm64/minikube/rootfs-overlay/etc/VERSION
 endif
 	if [ ! -d $(BUILD_DIR)/buildroot_$(GOARCH)_efi ]; then \
 		mkdir -p $(BUILD_DIR); \
@@ -270,6 +276,7 @@ endif
 	echo "module buildroot.org/go" > $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/go.mod
 	$(MAKE) GOARCH="" -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi
 	mv $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/images/disk.img $(BUILD_DIR)/minikube-$(GOARCH).img
+	bzip2 -k $(BUILD_DIR)/minikube-$(GOARCH).img
 
 # Change buildroot configuration for the minikube IMG
 .PHONY: img-menuconfig
@@ -288,7 +295,7 @@ endif
 ifeq ($(GOARCH),arm64)
 	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=$(GOARCH) menuconfig
 	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=$(GOARCH) savedefconfig
-	cp $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/aarch64-efi/minikube/linux_defconfig
+	cp $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/coreos-arm64/minikube/linux_defconfig
 endif
 
 out/minikube.iso: $(shell find "deploy/iso/minikube-iso" -type f)
@@ -426,7 +433,8 @@ e2e-cross: e2e-linux-amd64 e2e-darwin-amd64 e2e-windows-amd64.exe ## End-to-end 
 
 .PHONY: checksum
 checksum: ## Generate checksums
-	for f in out/minikube.iso out/minikube-linux-amd64 out/minikube-linux-arm \
+	for f in out/minikube.iso out/minikube-amd64.img.bz2 out/minikube-arm64.img.bz2 \
+		 out/minikube-linux-amd64 out/minikube-linux-arm \
 		 out/minikube-linux-arm64 out/minikube-linux-ppc64le out/minikube-linux-s390x \
 		 out/minikube-darwin-amd64 out/minikube-windows-amd64.exe \
 		 out/docker-machine-driver-kvm2 out/docker-machine-driver-hyperkit; do \
@@ -720,6 +728,11 @@ push-gvisor-addon-image: gvisor-addon-image
 release-iso: minikube_iso checksum  ## Build and release .iso file
 	gsutil cp out/minikube.iso gs://$(ISO_BUCKET)/minikube-$(ISO_VERSION).iso
 	gsutil cp out/minikube.iso.sha256 gs://$(ISO_BUCKET)/minikube-$(ISO_VERSION).iso.sha256
+
+.PHONY: release-img
+release-iso: minikube_img checksum  ## Build and release .img file
+	gsutil cp out/minikube-$(GOARCH).img gs://$(ISO_BUCKET)/minikube-$(GOARCH)-$(ISO_VERSION).img.bz2
+	gsutil cp out/minikube-$(GOARCH).img.sha256 gs://$(ISO_BUCKET)/minikube-$(GOARCH)-$(ISO_VERSION).img.bz2.sha256
 
 .PHONY: release-minikube
 release-minikube: out/minikube checksum ## Minikube release
