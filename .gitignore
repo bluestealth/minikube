@@ -30,7 +30,8 @@ _testmain.go
 /_gopath
 
 #iso version file
-deploy/iso/minikube-iso/board/coreos/minikube/rootfs-overlay/etc/VERSION
+deploy/iso/minikube-iso/board/coreos-amd64/minikube/rootfs-overlay/etc/VERSION
+deploy/iso/minikube-iso/board/coreos-arm64/minikube/rootfs-overlay/etc/VERSION
 
 /pkg/minikube/assets/assets.go-e
 /pkg/minikube/assets/assets.go
