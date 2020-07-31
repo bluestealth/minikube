@@ -12,8 +12,7 @@ CNI_PLUGINS_LICENSE_FILES = LICENSE
 
 CNI_PLUGINS_DEPENDENCIES = host-go
 
-CNI_PLUGINS_MAKE_ENV = \
-	$(GO_TARGET_ENV) \
+CNI_PLUGINS_GO_ENV = \
 	CGO_ENABLED=0 \
 	GO111MODULE=off
 
@@ -21,7 +20,7 @@ CNI_PLUGINS_BUILDFLAGS = -a -ldflags '-extldflags -static -X github.com/containe
 
 
 define CNI_PLUGINS_BUILD_CMDS
-	(cd $(@D); $(CNI_PLUGINS_MAKE_ENV) ./build_linux.sh $(CNI_PLUGINS_BUILDFLAGS))
+	(cd $(@D); $(GO_TARGET_ENV) $(CNI_PLUGINS_GO_ENV) ./build_linux.sh $(CNI_PLUGINS_BUILDFLAGS))
 endef
 
 define CNI_PLUGINS_INSTALL_TARGET_CMDS
@@ -131,4 +130,4 @@ define CNI_PLUGINS_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/usr/bin/firewall
 endef
 
-$(eval $(generic-package))
+$(eval $(golang-package))

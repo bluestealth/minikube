@@ -244,9 +244,46 @@ iso-menuconfig: ## Configure buildroot configuration
 # Change the kernel configuration for the minikube ISO
 .PHONY: linux-menuconfig
 linux-menuconfig:  ## Configure Linux kernel configuration
-	$(MAKE) -C $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/ menuconfig
-	$(MAKE) -C $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/ savedefconfig
+	$(MAKE) -C $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/ ARCH=x86_64 menuconfig
+	$(MAKE) -C $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/ ARCH=x86_64 savedefconfig
 	cp $(BUILD_DIR)/buildroot/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/coreos/minikube/linux_defconfig
+
+minikube_img:
+ifeq ($(GOARCH),amd64)
+	echo $(ISO_VERSION) > deploy/iso/minikube-iso/board/coreos/minikube/rootfs-overlay/etc/VERSION
+endif
+ifeq ($(GOARCH),arm64)
+	echo $(ISO_VERSION) > deploy/iso/minikube-iso/board/aarch64-efi/minikube/rootfs-overlay/etc/VERSION
+endif
+	if [ ! -d $(BUILD_DIR)/buildroot_$(GOARCH)_efi ]; then \
+		mkdir -p $(BUILD_DIR); \
+		git clone --depth=1 --branch=$(BUILDROOT_BRANCH) https://github.com/buildroot/buildroot $(BUILD_DIR)/buildroot_$(GOARCH)_efi; \
+	fi;
+	$(MAKE) BR2_EXTERNAL=../../deploy/iso/minikube-iso minikube_${GOARCH}_efi_defconfig -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi
+	mkdir -p $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build
+	echo "module buildroot.org/go" > $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/go.mod
+	$(MAKE) GOARCH="" -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi
+	mv $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/images/disk.img $(BUILD_DIR)/minikube-$(GOARCH).img
+
+# Change buildroot configuration for the minikube IMG
+.PHONY: img-menuconfig
+img-menuconfig: ## Configure buildroot configuration
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi menuconfig
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi savedefconfig
+
+# Change the kernel configuration for the minikube IMG
+.PHONY: img-linux-menuconfig
+img-linux-menuconfig:  ## Configure Linux kernel configuration
+ifeq ($(GOARCH),amd64)
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=x86_64 menuconfig
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=x86_64 savedefconfig
+	cp $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/coreos/minikube/linux_defconfig
+endif
+ifeq ($(GOARCH),arm64)
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=$(GOARCH) menuconfig
+	$(MAKE) -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/ ARCH=$(GOARCH) savedefconfig
+	cp $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/aarch64-efi/minikube/linux_defconfig
+endif
 
 out/minikube.iso: $(shell find "deploy/iso/minikube-iso" -type f)
 ifeq ($(IN_DOCKER),1)
@@ -255,6 +292,15 @@ else
 	$(DOCKER) run --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
 		--user $(shell id -u):$(shell id -g) --env HOME=/tmp --env IN_DOCKER=1 \
 		$(ISO_BUILD_IMAGE) /usr/bin/make out/minikube.iso
+endif
+
+out/minikube-$(GOARCH).img: $(shell find "deploy/iso/minikube-iso" -type f)
+ifeq ($(IN_DOCKER),1)
+	$(MAKE) minikube_img
+else
+	$(DOCKER_CLIENT) run --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
+		--user $(shell id -u):$(shell id -g) --env HOME=/tmp --env IN_DOCKER=1 --env GOARCH=$(GOARCH) \
+		$(ISO_BUILD_IMAGE) /usr/bin/make out/minikube-$(GOARCH).img
 endif
 
 iso_in_docker:
