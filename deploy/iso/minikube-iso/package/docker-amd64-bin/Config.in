@@ -1,0 +1,4 @@
+config BR2_PACKAGE_DOCKER_AMD64_BIN
+	bool "docker-amd64-bin"
+	default y
+	depends on BR2_x86_64
