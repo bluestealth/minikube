@@ -5,29 +5,41 @@ PODMAN_SITE = https://github.com/containers/podman/archive
 PODMAN_SOURCE = $(PODMAN_VERSION).tar.gz
 PODMAN_LICENSE = Apache-2.0
 PODMAN_LICENSE_FILES = LICENSE
-
+PODMAN_TAGS = exclude_graphdriver_devicemapper
 PODMAN_DEPENDENCIES = host-go
+PODMAN_BUILD_TARGETS = cmd/podman
+LIBPOD = github.com/containers/libpod/libpod
+PODMAN_LDFLAGS = \
+		-X $(LIBPOD)/define.gitCommit=$(PODMAN_COMMIT) \
+		-X $(LIBPOD)/define.buildInfo=$(shell date "+%s") \
+		-X $(LIBPOD)/config._installPrefix=/usr \
+		-X $(LIBPOD)/config._etcDir=/etc
+PODMAN_BUILD_OPTS = -mod=vendor -gcflags "all=-trimpath=$(@)" -asmflags "all=-trimpath=$(@)"
+PODMAN_GO_ENV = \
+	CGO_ENABLED=1   \
+	GO111MODULE=on
 
-PODMAN_GOPATH = $(@D)/_output
-PODMAN_BIN_ENV = \
-	$(GO_TARGET_ENV) \
-	CGO_ENABLED=1 \
-	GOPATH="$(PODMAN_GOPATH)" \
-	GOBIN="$(PODMAN_GOPATH)/bin" \
-	PATH=$(PODMAN_GOPATH)/bin:$(BR_PATH)
-
-
-define PODMAN_CONFIGURE_CMDS
-	mkdir -p $(PODMAN_GOPATH)/src/github.com/containers
-	ln -sf $(@D) $(PODMAN_GOPATH)/src/github.com/containers/libpod
-	mkdir -p $(PODMAN_GOPATH)/src/github.com/varlink
-	ln -sf $(@D)/vendor/github.com/varlink/go $(PODMAN_GOPATH)/src/github.com/varlink/go
-endef
-
-define PODMAN_BUILD_CMDS
-	mkdir -p $(@D)/bin
-	$(PODMAN_BIN_ENV) CIRRUS_TAG=$(PODMAN_VERSION) $(MAKE) $(TARGET_CONFIGURE_OPTS) -C $(@D) GIT_COMMIT=$(PODMAN_COMMIT) PREFIX=/usr podman
-endef
+ifneq ($(BR2_PACKAGE_BTRFS_PROGS),y)
+PODMAN_TAGS += exclude_graphdriver_btrfs btrfs_noversion
+else
+PODMAN_DEPENDENCIES += btrfs-progs
+endif
+ifeq ($(BR2_INIT_SYSTEMD),y)
+PODMAN_TAGS += systemd
+PODMAN_DEPENDENCIES += systemd
+endif
+ifeq ($(BR2_PACKAGE_APPARMOR),y)
+PODMAN_TAGS += apparmor
+PODMAN_DEPENDENCIES += libapparmor
+endif
+ifeq ($(BR2_PACKAGE_LIBSELINUX),y)
+PODMAN_TAGS += selinux
+PODMAN_DEPENDENCIES += libselinux
+endif
+ifeq ($(BR2_PACKAGE_LIBSECCOMP),y)
+PODMAN_TAGS += seccomp
+PODMAN_DEPENDENCIES += libseccomp
+endif
 
 define PODMAN_INSTALL_TARGET_CMDS
 	$(INSTALL) -Dm755 $(@D)/bin/podman $(TARGET_DIR)/usr/bin/podman
@@ -35,4 +47,4 @@ define PODMAN_INSTALL_TARGET_CMDS
 	$(INSTALL) -m 644 $(@D)/cni/87-podman-bridge.conflist $(TARGET_DIR)/etc/cni/net.d/87-podman-bridge.conflist
 endef
 
-$(eval $(generic-package))
+$(eval $(golang-package))
