@@ -50,7 +50,8 @@ require (
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d // indirect
 	github.com/juju/version v0.0.0-20180108022336-b64dbd566305 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/libvirt/libvirt-go v3.4.0+incompatible
+	github.com/libvirt/libvirt-go v6.9.0+incompatible
+	github.com/libvirt/libvirt-go-xml v6.9.0+incompatible
 	github.com/machine-drivers/docker-machine-driver-vmware v0.1.1
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/go-ps v0.0.0-20190716172923-621e5597135b
