@@ -1,7 +1,7 @@
 config BR2_PACKAGE_GLUSTER
 	bool "gluster"
 	default y
-	depends on BR2_x86_64
+	depends on (BR2_x86_64 || BR2_aarch64)
 	select BR2_PACKAGE_LIBAIO
 	select BR2_PACKAGE_LIBURCU
 	select BR2_PACKAGE_LIBCURL
