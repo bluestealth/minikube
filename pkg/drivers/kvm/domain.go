@@ -44,9 +44,14 @@ const domainTmpl = `
     </kvm>
     {{end}}
   </features>
+  {{if eq .VirtualizationType "kvm"}}
   <cpu mode='host-passthrough'/>
+  {{end}}
   <os>
     <type arch='{{.Platform}}' machine='{{.PlatformMachine}}'>{{.PlatformType}}</type>
+    {{if .Loader}}
+    <loader readonly='yes' type='pflash' secure='no'>{{.Loader}}</loader>
+    {{end}}
     <bootmenu enable='no'/>
   </os>
   <devices>
@@ -172,12 +177,20 @@ func (d *Driver) createDomain() (*libvirt.Domain, error) {
 
 	capabilities, err := GetHostCapabilities(conn)
 	if err != nil {
-		return nil, errors.Wrap(err, "getting host capabilities")
+		return nil, errors.Wrap(err, "error getting host capabilities")
 	}
-	d.Platform = capabilities.GetHostArch()
-	d.PlatformType = capabilities.GetPlatformOSType(d.Platform)
-	d.PlatformMachine = capabilities.GetPlatformMachine(d.Platform)
-	d.VirtualizationType = capabilities.GetVirtualizationType(d.Platform)
+
+	d.Platform = capabilities.Host.CPU.Arch
+	d.PlatformType = GetPlatformOSType(capabilities, d.Platform)
+	d.PlatformMachine = GetPlatformMachine(capabilities, d.Platform)
+	d.VirtualizationType = GetVirtualizationType(capabilities, d.Platform)
+	domainCapabilities, err := GetDomainCapabilities(conn, "", d.Platform, d.PlatformMachine, d.VirtualizationType)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting domain capabilities")
+	}
+	if len(domainCapabilities.OS.Loader.Values[0]) > 0 {
+		d.Loader = domainCapabilities.OS.Loader.Values[0]
+	}
 
 	// create the XML for the domain using our domainTmpl template
 	tmpl := template.Must(template.New("domain").Parse(domainTmpl))
@@ -185,7 +198,6 @@ func (d *Driver) createDomain() (*libvirt.Domain, error) {
 	if err := tmpl.Execute(&domainXML, d); err != nil {
 		return nil, errors.Wrap(err, "executing domain xml")
 	}
-
 	// define the domain in libvirt using the generated XML
 	dom, err := conn.DomainDefineXML(domainXML.String())
 	if err != nil {
