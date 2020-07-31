@@ -1,0 +1,447 @@
+From 4f7e4433b1d718b27a49c1fcba050d4b93f1bb2d Mon Sep 17 00:00:00 2001
+From: Nathan Baker <nathan.baker@sysdig.com>
+Date: Tue, 28 Apr 2020 15:46:40 -0400
+Subject: [PATCH 1/3] Fix compile errors on Linux 5.6 due to timespec / timeval
+
+---
+ driver/main.c              | 60 ++++++++++++++++++++------------------
+ driver/ppm.h               | 10 +++++--
+ driver/ppm_events_public.h |  1 +
+ driver/ppm_fillers.c       | 26 ++++++++++++++++-
+ 4 files changed, 65 insertions(+), 32 deletions(-)
+
+diff --git a/driver/main.c b/driver/main.c
+index a9febf28..c16bb7e8 100644
+--- a/driver/main.c
++++ b/driver/main.c
+@@ -124,13 +124,13 @@ static int ppm_release(struct inode *inode, struct file *filp);
+ static long ppm_ioctl(struct file *f, unsigned int cmd, unsigned long arg);
+ static int ppm_mmap(struct file *filp, struct vm_area_struct *vma);
+ static int record_event_consumer(struct ppm_consumer_t *consumer,
+-	enum ppm_event_type event_type,
+-	enum syscall_flags drop_flags,
+-	struct timespec *ts,
+-	struct event_data_t *event_datap);
++                                 enum ppm_event_type event_type,
++                                 enum syscall_flags drop_flags,
++                                 nanoseconds ns,
++                                 struct event_data_t *event_datap);
+ static void record_event_all_consumers(enum ppm_event_type event_type,
+-	enum syscall_flags drop_flags,
+-	struct event_data_t *event_datap);
++                                       enum syscall_flags drop_flags,
++                                       struct event_data_t *event_datap);
+ static int init_ring_buffer(struct ppm_ring_buffer_context *ring);
+ static void free_ring_buffer(struct ppm_ring_buffer_context *ring);
+ static void reset_ring_buffer(struct ppm_ring_buffer_context *ring);
+@@ -225,6 +225,11 @@ do {								\
+ 		pr_info(fmt, ##__VA_ARGS__);			\
+ } while (0)
+ 
++nanoseconds ppm_nsecs(void)
++{
++	return ktime_get_real_ns();
++}
++
+ /* compat tracepoint functions */
+ static int compat_register_trace(void *func, const char *probename, struct tracepoint *tp)
+ {
+@@ -820,7 +825,6 @@ cleanup_ioctl_procinfo:
+ 	case PPM_IOCTL_DISABLE_DROPPING_MODE:
+ 	{
+ 		struct event_data_t event_data;
+-		struct timespec ts;
+ 
+ 		vpr_info("PPM_IOCTL_DISABLE_DROPPING_MODE, consumer %p\n", consumer_id);
+ 
+@@ -832,12 +836,11 @@ cleanup_ioctl_procinfo:
+ 		 * Push an event into the ring buffer so that the user can know that dropping
+ 		 * mode has been disabled
+ 		 */
+-		getnstimeofday(&ts);
+ 		event_data.category = PPMC_CONTEXT_SWITCH;
+ 		event_data.event_info.context_data.sched_prev = (void *)DEI_DISABLE_DROPPING;
+ 		event_data.event_info.context_data.sched_next = (void *)0;
+ 
+-		record_event_consumer(consumer, PPME_SYSDIGEVENT_E, UF_NEVER_DROP, &ts, &event_data);
++		record_event_consumer(consumer, PPME_SYSDIGEVENT_E, UF_NEVER_DROP, ppm_nsecs(), &event_data);
+ 
+ 		ret = 0;
+ 		goto cleanup_ioctl;
+@@ -1362,11 +1365,11 @@ static enum ppm_event_type parse_socketcall(struct event_filler_arguments *fille
+ }
+ #endif /* _HAS_SOCKETCALL */
+ 
+-static inline void record_drop_e(struct ppm_consumer_t *consumer, struct timespec *ts)
++static inline void record_drop_e(struct ppm_consumer_t *consumer, nanoseconds ns)
+ {
+ 	struct event_data_t event_data = {0};
+ 
+-	if (record_event_consumer(consumer, PPME_DROP_E, UF_NEVER_DROP, ts, &event_data) == 0) {
++	if (record_event_consumer(consumer, PPME_DROP_E, UF_NEVER_DROP, ns, &event_data) == 0) {
+ 		consumer->need_to_insert_drop_e = 1;
+ 	} else {
+ 		if (consumer->need_to_insert_drop_e == 1)
+@@ -1376,11 +1379,11 @@ static inline void record_drop_e(struct ppm_consumer_t *consumer, struct timespe
+ 	}
+ }
+ 
+-static inline void record_drop_x(struct ppm_consumer_t *consumer, struct timespec *ts)
++static inline void record_drop_x(struct ppm_consumer_t *consumer, nanoseconds ns)
+ {
+ 	struct event_data_t event_data = {0};
+ 
+-	if (record_event_consumer(consumer, PPME_DROP_X, UF_NEVER_DROP, ts, &event_data) == 0) {
++	if (record_event_consumer(consumer, PPME_DROP_X, UF_NEVER_DROP, ns, &event_data) == 0) {
+ 		consumer->need_to_insert_drop_x = 1;
+ 	} else {
+ 		if (consumer->need_to_insert_drop_x == 1)
+@@ -1453,7 +1456,7 @@ static inline int drop_nostate_event(enum ppm_event_type event_type,
+ static inline int drop_event(struct ppm_consumer_t *consumer,
+ 			     enum ppm_event_type event_type,
+ 			     enum syscall_flags drop_flags,
+-			     struct timespec *ts,
++			     nanoseconds ns,
+ 			     struct pt_regs *regs)
+ {
+ 	int maybe_ret = 0;
+@@ -1475,10 +1478,11 @@ static inline int drop_event(struct ppm_consumer_t *consumer,
+ 			return 1;
+ 		}
+ 
+-		if (ts->tv_nsec >= consumer->sampling_interval) {
++		if (consumer->sampling_interval < second_in_ns &&
++		    (ns % second_in_ns) >= consumer->sampling_interval) {
+ 			if (consumer->is_dropping == 0) {
+ 				consumer->is_dropping = 1;
+-				record_drop_e(consumer, ts);
++				record_drop_e(consumer, ns);
+ 			}
+ 
+ 			return 1;
+@@ -1486,7 +1490,7 @@ static inline int drop_event(struct ppm_consumer_t *consumer,
+ 
+ 		if (consumer->is_dropping == 1) {
+ 			consumer->is_dropping = 0;
+-			record_drop_x(consumer, ts);
++			record_drop_x(consumer, ns);
+ 		}
+ 	}
+ 
+@@ -1498,13 +1502,11 @@ static void record_event_all_consumers(enum ppm_event_type event_type,
+ 	struct event_data_t *event_datap)
+ {
+ 	struct ppm_consumer_t *consumer;
+-	struct timespec ts;
+-
+-	getnstimeofday(&ts);
++	nanoseconds ns = ppm_nsecs();
+ 
+ 	rcu_read_lock();
+ 	list_for_each_entry_rcu(consumer, &g_consumer_list, node) {
+-		record_event_consumer(consumer, event_type, drop_flags, &ts, event_datap);
++		record_event_consumer(consumer, event_type, drop_flags, ns, event_datap);
+ 	}
+ 	rcu_read_unlock();
+ }
+@@ -1515,7 +1517,7 @@ static void record_event_all_consumers(enum ppm_event_type event_type,
+ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ 	enum ppm_event_type event_type,
+ 	enum syscall_flags drop_flags,
+-	struct timespec *ts,
++    nanoseconds ns,
+ 	struct event_data_t *event_datap)
+ {
+ 	int res = 0;
+@@ -1538,11 +1540,11 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ 
+ 	if (event_type != PPME_DROP_E && event_type != PPME_DROP_X) {
+ 		if (consumer->need_to_insert_drop_e == 1)
+-			record_drop_e(consumer, ts);
++			record_drop_e(consumer, ns);
+ 		else if (consumer->need_to_insert_drop_x == 1)
+-			record_drop_x(consumer, ts);
++			record_drop_x(consumer, ns);
+ 
+-		if (drop_event(consumer, event_type, drop_flags, ts,
++		if (drop_event(consumer, event_type, drop_flags, ns,
+ 			       event_datap->event_info.syscall_data.regs))
+ 			return res;
+ 	}
+@@ -1669,7 +1671,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ #ifdef PPM_ENABLE_SENTINEL
+ 		hdr->sentinel_begin = ring->nevents;
+ #endif
+-		hdr->ts = timespec_to_ns(ts);
++		hdr->ts = ns;
+ 		hdr->tid = current->pid;
+ 		hdr->type = event_type;
+ 		hdr->nparams = args.nargs;
+@@ -1817,7 +1819,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ 		}
+ 	}
+ 
+-	if (ts->tv_sec > ring->last_print_time.tv_sec + 1) {
++	if (more_than_one_second_ahead(ns, ring->last_print_time + 1) && !(drop_flags & UF_ATOMIC)) {
+ 		vpr_info("consumer:%p CPU:%d, use:%d%%, ev:%llu, dr_buf:%llu, dr_pf:%llu, pr:%llu, cs:%llu\n",
+ 			   consumer->consumer_id,
+ 		       smp_processor_id(),
+@@ -1828,7 +1830,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ 		       ring_info->n_preemptions,
+ 		       ring->info->n_context_switches);
+ 
+-		ring->last_print_time = *ts;
++		ring->last_print_time = ns;
+ 	}
+ 
+ 	atomic_dec(&ring->preempt_count);
+@@ -2183,7 +2185,7 @@ static void reset_ring_buffer(struct ppm_ring_buffer_context *ring)
+ 	ring->info->n_drops_pf = 0;
+ 	ring->info->n_preemptions = 0;
+ 	ring->info->n_context_switches = 0;
+-	getnstimeofday(&ring->last_print_time);
++	ring->last_print_time = ppm_nsecs();
+ }
+ 
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+diff --git a/driver/ppm.h b/driver/ppm.h
+index fa8f3378..6aaf4282 100644
+--- a/driver/ppm.h
++++ b/driver/ppm.h
+@@ -30,7 +30,7 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
+ #define ASSERT(expr)
+ #endif
+ 
+-#include <linux/time.h>
++typedef u64 nanoseconds;
+ 
+ /*
+  * Global defines
+@@ -59,7 +59,7 @@ struct ppm_ring_buffer_context {
+ 	bool capture_enabled;
+ 	struct ppm_ring_buffer_info *info;
+ 	char *buffer;
+-	struct timespec last_print_time;
++	nanoseconds last_print_time;
+ 	u32 nevents;
+ 	atomic_t preempt_count;
+ 	char *str_storage;	/* String storage. Size is one page. */
+@@ -120,4 +120,10 @@ extern const struct syscall_evt_pair g_syscall_ia32_table[];
+ extern const enum ppm_syscall_code g_syscall_ia32_code_routing_table[];
+ #endif
+ 
++extern nanoseconds ppm_nsecs(void);
++
++#define ns_to_sec(_ns) ((_ns) / 1000000000)
++#define more_than_one_second_ahead(_ns1, _ns2) ((_ns1) - (_ns2) > 1000000000)
++#define second_in_ns 1000000000
++
+ #endif /* PPM_H_ */
+diff --git a/driver/ppm_events_public.h b/driver/ppm_events_public.h
+index 92b7506a..5dbd96db 100644
+--- a/driver/ppm_events_public.h
++++ b/driver/ppm_events_public.h
+@@ -1436,6 +1436,7 @@ enum syscall_flags {
+ 	UF_NEVER_DROP = (1 << 1),
+ 	UF_ALWAYS_DROP = (1 << 2),
+ 	UF_SIMPLEDRIVER_KEEP = (1 << 3),
++	UF_ATOMIC = (1 << 4), ///< The handler should not block (interrupt context)
+ };
+ 
+ struct syscall_evt_pair {
+diff --git a/driver/ppm_fillers.c b/driver/ppm_fillers.c
+index e595c0f0..7c371b94 100644
+--- a/driver/ppm_fillers.c
++++ b/driver/ppm_fillers.c
+@@ -54,6 +54,30 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
+ #include <linux/bpf.h>
+ #endif
+ 
++/*
++ * Linux 5.6 kernels no longer include the old 32-bit timeval
++ * structures. But the syscalls (might) still use them.
++ */
++#include <linux/time64.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
++struct compat_timespec {
++	int32_t tv_sec;
++	int32_t tv_nsec;
++};
++
++struct timespec {
++	int32_t tv_sec;
++	int32_t tv_nsec;
++};
++
++struct timeval {
++	int32_t tv_sec;
++	int32_t tv_usec;
++};
++#else
++#define timeval64 timeval
++#endif
++
+ #define merge_64(hi, lo) ((((unsigned long long)(hi)) << 32) + ((lo) & 0xffffffffUL))
+ 
+ int f_sys_generic(struct event_filler_arguments *args)
+@@ -2310,7 +2334,7 @@ static int timespec_parse(struct event_filler_arguments *args, unsigned long val
+ #ifdef CONFIG_COMPAT
+ 	if (!args->compat) {
+ #endif
+-		cfulen = (int)ppm_copy_from_user(targetbuf, (void __user *)val, sizeof(struct timespec));
++		cfulen = (int)ppm_copy_from_user(targetbuf, (void __user *)val, sizeof(*tts));
+ 		if (unlikely(cfulen != 0))
+ 			return PPM_FAILURE_INVALID_USER_MEMORY;
+ 
+-- 
+2.26.2
+
+From 8625b39286f96b320323d864e2c850bcb5782633 Mon Sep 17 00:00:00 2001
+From: Nathan Baker <nathan.baker@sysdig.com>
+Date: Tue, 28 Apr 2020 16:48:58 -0400
+Subject: [PATCH 2/3] Formatting fixes
+
+---
+ driver/main.c        | 2 +-
+ driver/ppm_fillers.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/driver/main.c b/driver/main.c
+index c16bb7e8..19b33c43 100644
+--- a/driver/main.c
++++ b/driver/main.c
+@@ -1517,7 +1517,7 @@ static void record_event_all_consumers(enum ppm_event_type event_type,
+ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ 	enum ppm_event_type event_type,
+ 	enum syscall_flags drop_flags,
+-    nanoseconds ns,
++	nanoseconds ns,
+ 	struct event_data_t *event_datap)
+ {
+ 	int res = 0;
+diff --git a/driver/ppm_fillers.c b/driver/ppm_fillers.c
+index 7c371b94..c8837ad8 100644
+--- a/driver/ppm_fillers.c
++++ b/driver/ppm_fillers.c
+@@ -58,8 +58,8 @@ along with sysdig.  If not, see <http://www.gnu.org/licenses/>.
+  * Linux 5.6 kernels no longer include the old 32-bit timeval
+  * structures. But the syscalls (might) still use them.
+  */
+-#include <linux/time64.h>
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
++#include <linux/time64.h>
+ struct compat_timespec {
+ 	int32_t tv_sec;
+ 	int32_t tv_nsec;
+-- 
+2.26.2
+
+From f65e0b13ede4cb504c5dd02a682b883d62d6e0eb Mon Sep 17 00:00:00 2001
+From: Nathan Baker <nathan.baker@sysdig.com>
+Date: Wed, 29 Apr 2020 10:20:09 -0400
+Subject: [PATCH 3/3] Review comments
+
+---
+ driver/bpf/fillers.h | 26 +++++++++++++++++++++++++-
+ driver/main.c        |  8 ++++----
+ driver/ppm.h         |  8 +++-----
+ 3 files changed, 32 insertions(+), 10 deletions(-)
+
+diff --git a/driver/bpf/fillers.h b/driver/bpf/fillers.h
+index 9ce07a58..48c09cbc 100644
+--- a/driver/bpf/fillers.h
++++ b/driver/bpf/fillers.h
+@@ -5,6 +5,30 @@
+ 
+ #include <linux/tty.h>
+ 
++/*
++ * Linux 5.6 kernels no longer include the old 32-bit timeval
++ * structures. But the syscalls (might) still use them.
++ */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
++#include <linux/time64.h>
++struct compat_timespec {
++	int32_t tv_sec;
++	int32_t tv_nsec;
++};
++
++struct timespec {
++	int32_t tv_sec;
++	int32_t tv_nsec;
++};
++
++struct timeval {
++	int32_t tv_sec;
++	int32_t tv_usec;
++};
++#else
++#define timeval64 timeval
++#endif
++
+ #define FILLER_RAW(x)							\
+ static __always_inline int __bpf_##x(struct filler_data *data);		\
+ 									\
+@@ -507,7 +531,7 @@ FILLER(sys_writev_pwritev_x, true)
+ }
+ 
+ static __always_inline int timespec_parse(struct filler_data *data,
+-					  unsigned long val)
++                                          unsigned long val)
+ {
+ 	u64 longtime;
+ 	struct timespec ts;
+diff --git a/driver/main.c b/driver/main.c
+index 19b33c43..8a92a45d 100644
+--- a/driver/main.c
++++ b/driver/main.c
+@@ -225,7 +225,7 @@ do {								\
+ 		pr_info(fmt, ##__VA_ARGS__);			\
+ } while (0)
+ 
+-nanoseconds ppm_nsecs(void)
++static inline nanoseconds ppm_nsecs(void)
+ {
+ 	return ktime_get_real_ns();
+ }
+@@ -1478,8 +1478,8 @@ static inline int drop_event(struct ppm_consumer_t *consumer,
+ 			return 1;
+ 		}
+ 
+-		if (consumer->sampling_interval < second_in_ns &&
+-		    (ns % second_in_ns) >= consumer->sampling_interval) {
++		if (consumer->sampling_interval < SECOND_IN_NS &&
++		    (ns % SECOND_IN_NS) >= consumer->sampling_interval) {
+ 			if (consumer->is_dropping == 0) {
+ 				consumer->is_dropping = 1;
+ 				record_drop_e(consumer, ns);
+@@ -1819,7 +1819,7 @@ static int record_event_consumer(struct ppm_consumer_t *consumer,
+ 		}
+ 	}
+ 
+-	if (more_than_one_second_ahead(ns, ring->last_print_time + 1) && !(drop_flags & UF_ATOMIC)) {
++	if (MORE_THAN_ONE_SECOND_AHEAD(ns, ring->last_print_time + 1) && !(drop_flags & UF_ATOMIC)) {
+ 		vpr_info("consumer:%p CPU:%d, use:%d%%, ev:%llu, dr_buf:%llu, dr_pf:%llu, pr:%llu, cs:%llu\n",
+ 			   consumer->consumer_id,
+ 		       smp_processor_id(),
+diff --git a/driver/ppm.h b/driver/ppm.h
+index 6aaf4282..60508070 100644
+--- a/driver/ppm.h
++++ b/driver/ppm.h
+@@ -120,10 +120,8 @@ extern const struct syscall_evt_pair g_syscall_ia32_table[];
+ extern const enum ppm_syscall_code g_syscall_ia32_code_routing_table[];
+ #endif
+ 
+-extern nanoseconds ppm_nsecs(void);
+-
+-#define ns_to_sec(_ns) ((_ns) / 1000000000)
+-#define more_than_one_second_ahead(_ns1, _ns2) ((_ns1) - (_ns2) > 1000000000)
+-#define second_in_ns 1000000000
++#define NS_TO_SEC(_ns) ((_ns) / 1000000000)
++#define MORE_THAN_ONE_SECOND_AHEAD(_ns1, _ns2) ((_ns1) - (_ns2) > 1000000000)
++#define SECOND_IN_NS 1000000000
+ 
+ #endif /* PPM_H_ */
+-- 
+2.26.2
+
