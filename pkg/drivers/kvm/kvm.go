@@ -50,6 +50,9 @@ type Driver struct {
 	// What CPU Platform Machine type is being used
 	PlatformMachine string
 
+	// What OS Loader binary is being used
+	Loader string
+
 	// How much memory, in MB, to allocate to the VM
 	Memory int
 
@@ -481,10 +484,11 @@ func (d *Driver) undefineDomain(conn *libvirt.Connect, dom *libvirt.Domain) erro
 		return errors.Wrap(err, "list defined domains")
 	}
 
-	var found bool
+	var found, hasNvram bool
 	for _, domain := range definedDomains {
 		if domain == d.MachineName {
 			found = true
+			hasNvram = d.Loader != ""
 			break
 		}
 	}
@@ -494,6 +498,14 @@ func (d *Driver) undefineDomain(conn *libvirt.Connect, dom *libvirt.Domain) erro
 		return nil
 	}
 
+	hasNvram, err = DomainHasNVRAM(dom)
+	if err != nil {
+		errors.Wrap(err, "domain has nvram")
+	}
+
+	if hasNvram {
+		return dom.UndefineFlags(libvirt.DOMAIN_UNDEFINE_NVRAM)
+	}
 	return dom.Undefine()
 }
 
