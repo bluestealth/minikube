@@ -12,24 +12,12 @@ CNI_LICENSE_FILES = LICENSE
 
 CNI_DEPENDENCIES = host-go
 
-CNI_GOPATH = $(@D)/_output
-CNI_MAKE_ENV = \
+CNI_GO_ENV = \
 	CGO_ENABLED=0 \
-	GO111MODULE=off \
-	GOPATH="$(CNI_GOPATH)" \
-	GOBIN="$(CNI_GOPATH)/bin" \
-	PATH=$(CNI_GOPATH)/bin:$(BR_PATH)
+	GO111MODULE=off
 
-CNI_BUILDFLAGS = -a --ldflags '-extldflags \"-static\"'
-
-define CNI_CONFIGURE_CMDS
-        mkdir -p $(CNI_GOPATH)/src/github.com/containernetworking
-        ln -sf $(@D) $(CNI_GOPATH)/src/github.com/containernetworking/cni
-endef
-
-define CNI_BUILD_CMDS
-	(cd $(@D); $(CNI_MAKE_ENV) go build -o bin/cnitool $(CNI_BUILDFLAGS) ./cnitool)
-endef
+CNI_LDFLAGS = -extldflags '-static'
+CNI_BUILD_TARGETS = cnitool
 
 define CNI_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 \
@@ -41,4 +29,4 @@ define CNI_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/usr/bin/cnitool
 endef
 
-$(eval $(generic-package))
+$(eval $(golang-package))

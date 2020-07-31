@@ -1,0 +1,11 @@
+-- crio-bin-v1.18.2/pinns/Makefile	2020-06-18 20:40:32.000000000 +0000
++++ crio-bin-v1.18.2.patched/pinns/Makefile	2020-07-07 00:50:20.940140878 +0000
+@@ -9,7 +9,7 @@
+ 
+ ../bin/pinns: $(obj) | ../bin
+ 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+-	strip -s $@
++	$(STRIP) -s $@
+ 
+ ../bin:
+ 	mkdir -p $@
