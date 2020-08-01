@@ -188,9 +188,8 @@ func (d *Driver) createDomain() (*libvirt.Domain, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting domain capabilities")
 	}
-	if len(domainCapabilities.OS.Loader.Values[0]) > 0 {
-		d.Loader = domainCapabilities.OS.Loader.Values[0]
-	}
+
+	d.Loader = GetLoader(domainCapabilities.OS.Loader, d.Platform)
 
 	// create the XML for the domain using our domainTmpl template
 	tmpl := template.Must(template.New("domain").Parse(domainTmpl))
