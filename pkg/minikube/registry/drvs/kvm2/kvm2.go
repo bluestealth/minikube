@@ -55,21 +55,35 @@ func init() {
 // This is duplicate of kvm.Driver. Avoids importing the kvm2 driver, which requires cgo & libvirt.
 type kvmDriver struct {
 	*drivers.BaseDriver
-
-	Memory         int
-	DiskSize       int
-	CPU            int
-	Network        string
-	PrivateNetwork string
-	ISO            string
-	Boot2DockerURL string
-	DiskPath       string
-	GPU            bool
-	Hidden         bool
-	ConnectionURI  string
+	VirtualizationType string
+	Platform           string
+	PlatformType       string
+	PlatformMachine    string
+	Loader             string
+	Memory             int
+	DiskSize           int
+	CPU                int
+	Network            string
+	PrivateNetwork     string
+	ISO                string
+	Boot2DockerURL     string
+	DiskPath           string
+	GPU                bool
+	Hidden             bool
+	ConnectionURI      string
 }
 
 func configure(cc config.ClusterConfig, n config.Node) (interface{}, error) {
+	var platform string
+	switch cc.KubernetesConfig.TargetArch {
+	case "arm64":
+		platform = "aarch64"
+	case "amd64":
+		platform = "x86_64"
+	default:
+		platform = cc.KubernetesConfig.TargetArch
+	}
+
 	name := driver.MachineName(cc, n)
 	return kvmDriver{
 		BaseDriver: &drivers.BaseDriver{
@@ -77,6 +91,7 @@ func configure(cc config.ClusterConfig, n config.Node) (interface{}, error) {
 			StorePath:   localpath.MiniPath(),
 			SSHUser:     "docker",
 		},
+		Platform:       platform,
 		Memory:         cc.Memory,
 		CPU:            cc.CPUs,
 		Network:        cc.KVMNetwork,

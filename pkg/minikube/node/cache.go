@@ -19,6 +19,7 @@ package node
 import (
 	"fmt"
 	"os"
+	"path"
 	"runtime"
 	"strings"
 
@@ -48,11 +49,11 @@ const (
 )
 
 // BeginCacheKubernetesImages caches images required for Kubernetes version in the background
-func beginCacheKubernetesImages(g *errgroup.Group, imageRepository string, k8sVersion string, cRuntime string) {
+func beginCacheKubernetesImages(g *errgroup.Group, imageRepository string, k8sVersion string, cRuntime, archName string) {
 	// TODO: remove imageRepository check once #7695 is fixed
-	if imageRepository == "" && download.PreloadExists(k8sVersion, cRuntime) {
+	if imageRepository == "" && download.PreloadExists(k8sVersion, cRuntime, archName) {
 		klog.Info("Caching tarball of preloaded images")
-		err := download.Preload(k8sVersion, cRuntime)
+		err := download.Preload(k8sVersion, cRuntime, archName)
 		if err == nil {
 			klog.Infof("Finished verifying existence of preloaded tar for  %s on %s", k8sVersion, cRuntime)
 			return // don't cache individual images if preload is successful.
@@ -65,17 +66,17 @@ func beginCacheKubernetesImages(g *errgroup.Group, imageRepository string, k8sVe
 	}
 
 	g.Go(func() error {
-		return machine.CacheImagesForBootstrapper(imageRepository, k8sVersion, viper.GetString(cmdcfg.Bootstrapper))
+		return machine.CacheImagesForBootstrapper(imageRepository, k8sVersion, viper.GetString(cmdcfg.Bootstrapper), archName)
 	})
 }
 
 // HandleDownloadOnly caches appropariate binaries and images
-func handleDownloadOnly(cacheGroup, kicGroup *errgroup.Group, k8sVersion string) {
+func handleDownloadOnly(cacheGroup, kicGroup *errgroup.Group, k8sVersion, arch string) {
 	// If --download-only, complete the remaining downloads and exit.
 	if !viper.GetBool("download-only") {
 		return
 	}
-	if err := doCacheBinaries(k8sVersion); err != nil {
+	if err := doCacheBinaries(k8sVersion, arch); err != nil {
 		exit.Error(reason.InetCacheBinaries, "Failed to cache binaries", err)
 	}
 	if _, err := CacheKubectlBinary(k8sVersion); err != nil {
@@ -83,7 +84,7 @@ func handleDownloadOnly(cacheGroup, kicGroup *errgroup.Group, k8sVersion string)
 	}
 	waitCacheRequiredImages(cacheGroup)
 	waitDownloadKicBaseImage(kicGroup)
-	if err := saveImagesToTarFromConfig(); err != nil {
+	if err := saveImagesToTarFromConfig(arch); err != nil {
 		exit.Error(reason.InetCacheTar, "Failed to cache images to tar", err)
 	}
 	out.Step(style.Check, "Download complete!")
@@ -101,8 +102,8 @@ func CacheKubectlBinary(k8sVersion string) (string, error) {
 }
 
 // doCacheBinaries caches Kubernetes binaries in the foreground
-func doCacheBinaries(k8sVersion string) error {
-	return machine.CacheBinariesForBootstrapper(k8sVersion, viper.GetString(cmdcfg.Bootstrapper))
+func doCacheBinaries(k8sVersion string, arch string) error {
+	return machine.CacheBinariesForBootstrapper(k8sVersion, viper.GetString(cmdcfg.Bootstrapper), arch)
 }
 
 // beginDownloadKicBaseImage downloads the kic image
@@ -134,7 +135,7 @@ func beginDownloadKicBaseImage(g *errgroup.Group, cc *config.ClusterConfig, down
 			}
 		}()
 		for _, img := range append([]string{baseImg}, kic.FallbackImages...) {
-			if err := image.LoadFromTarball(driver.Docker, img); err == nil {
+			if err := image.LoadFromTarball(driver.Docker, img, cc.KubernetesConfig.TargetArch); err == nil {
 				klog.Infof("successfully loaded %s from cached tarball", img)
 				// strip the digest from the img before saving it in the config
 				// because loading an image from tarball to daemon doesn't load the digest
@@ -149,7 +150,7 @@ func beginDownloadKicBaseImage(g *errgroup.Group, cc *config.ClusterConfig, down
 				return nil
 			}
 			if downloadOnly {
-				if err := image.SaveToDir([]string{img}, constants.ImageCacheDir); err == nil {
+				if err := image.SaveToDir([]string{img}, path.Join(constants.ImageCacheDir, cc.KubernetesConfig.TargetArch)); err == nil {
 					klog.Infof("successfully saved %s as a tarball", img)
 					finalImg = img
 					return nil
@@ -196,7 +197,7 @@ func waitCacheRequiredImages(g *errgroup.Group) {
 
 // saveImagesToTarFromConfig saves images to tar in cache which specified in config file.
 // currently only used by download-only option
-func saveImagesToTarFromConfig() error {
+func saveImagesToTarFromConfig(arch string) error {
 	images, err := imagesInConfigFile()
 	if err != nil {
 		return err
@@ -204,12 +205,12 @@ func saveImagesToTarFromConfig() error {
 	if len(images) == 0 {
 		return nil
 	}
-	return image.SaveToDir(images, constants.ImageCacheDir)
+	return image.SaveToDir(images, path.Join(constants.ImageCacheDir, arch))
 }
 
 // CacheAndLoadImagesInConfig loads the images currently in the config file
 // called by 'start' and 'cache reload' commands.
-func CacheAndLoadImagesInConfig() error {
+func CacheAndLoadImagesInConfig(arch string) error {
 	images, err := imagesInConfigFile()
 	if err != nil {
 		return errors.Wrap(err, "images")
@@ -217,7 +218,7 @@ func CacheAndLoadImagesInConfig() error {
 	if len(images) == 0 {
 		return nil
 	}
-	return machine.CacheAndLoadImages(images)
+	return machine.CacheAndLoadImages(images, arch)
 }
 
 func imagesInConfigFile() ([]string, error) {

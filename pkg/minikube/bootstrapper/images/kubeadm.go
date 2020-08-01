@@ -24,12 +24,12 @@ import (
 )
 
 // Kubeadm returns a list of images necessary to bootstrap kubeadm
-func Kubeadm(mirror string, version string) ([]string, error) {
+func Kubeadm(mirror string, version string, arch string) ([]string, error) {
 	v, err := semver.Make(strings.TrimPrefix(version, "v"))
 	if err != nil {
 		return nil, errors.Wrap(err, "semver")
 	}
-	imgs := essentials(mirror, v)
-	imgs = append(imgs, auxiliary(mirror)...)
+	imgs := essentials(mirror, v, arch)
+	imgs = append(imgs, auxiliary(mirror, arch)...)
 	return imgs, nil
 }

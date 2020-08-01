@@ -45,7 +45,7 @@ func binaryWithChecksumURL(binaryName, version, osName, archName string) (string
 // Binary will download a binary onto the host
 func Binary(binary, version, osName, archName string) (string, error) {
 	targetDir := localpath.MakeMiniPath("cache", osName, version)
-	targetFilepath := path.Join(targetDir, binary)
+	targetFilepath := path.Join(targetDir, archName, binary)
 
 	url, err := binaryWithChecksumURL(binary, version, osName, archName)
 	if err != nil {
@@ -62,7 +62,7 @@ func Binary(binary, version, osName, archName string) (string, error) {
 	}
 
 	if osName == runtime.GOOS && archName == runtime.GOARCH {
-		if err = os.Chmod(targetFilepath, 0755); err != nil {
+		if err = os.Chmod(targetFilepath, 0o755); err != nil {
 			return "", errors.Wrapf(err, "chmod +x %s", targetFilepath)
 		}
 	}

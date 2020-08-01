@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -140,7 +141,7 @@ var settings = []Setting{
 	},
 	{
 		name: Bootstrapper,
-		set:  SetString, //TODO(r2d4): more validation here?
+		set:  SetString, // TODO(r2d4): more validation here?
 	},
 	{
 		name: config.ShowDriverDeprecationNotification,
@@ -199,7 +200,10 @@ func configurableFields() string {
 }
 
 // ListConfigMap list entries from config file
-func ListConfigMap(name string) ([]string, error) {
+func ListConfigMap(name string, arch string) ([]string, error) {
+	if arch != runtime.GOARCH {
+		name += "-" + arch
+	}
 	configFile, err := config.ReadConfig(localpath.ConfigFile())
 	if err != nil {
 		return nil, err
@@ -214,7 +218,10 @@ func ListConfigMap(name string) ([]string, error) {
 }
 
 // AddToConfigMap adds entries to a map in the config file
-func AddToConfigMap(name string, images []string) error {
+func AddToConfigMap(name string, images []string, arch string) error {
+	if arch != runtime.GOARCH {
+		name += "-" + arch
+	}
 	s, err := findSetting(name)
 	if err != nil {
 		return err
@@ -241,7 +248,10 @@ func AddToConfigMap(name string, images []string) error {
 }
 
 // DeleteFromConfigMap deletes entries from a map in the config file
-func DeleteFromConfigMap(name string, images []string) error {
+func DeleteFromConfigMap(name string, images []string, arch string) error {
+	if arch != runtime.GOARCH {
+		name += "-" + arch
+	}
 	s, err := findSetting(name)
 	if err != nil {
 		return err

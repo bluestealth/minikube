@@ -731,7 +731,7 @@ func validateDriver(ds registry.DriverState, existing *config.ClusterConfig) {
 	}, st.Error.Error())
 }
 
-func selectImageRepository(mirrorCountry string, v semver.Version) (bool, string, error) {
+func selectImageRepository(mirrorCountry string, v semver.Version, arch string) (bool, string, error) {
 	var tryCountries []string
 	var fallback string
 	klog.Infof("selecting image repository for country %s ...", mirrorCountry)
@@ -758,8 +758,8 @@ func selectImageRepository(mirrorCountry string, v semver.Version) (bool, string
 		}
 	}
 
-	checkRepository := func(repo string) error {
-		pauseImage := images.Pause(v, repo)
+	checkRepository := func(repo, arch string) error {
+		pauseImage := images.Pause(v, repo, arch)
 		ref, err := name.ParseReference(pauseImage, name.WeakValidation)
 		if err != nil {
 			return err
@@ -772,7 +772,7 @@ func selectImageRepository(mirrorCountry string, v semver.Version) (bool, string
 	for _, code := range tryCountries {
 		localRepos := constants.ImageRepositories[code]
 		for _, repo := range localRepos {
-			err := checkRepository(repo)
+			err := checkRepository(repo, arch)
 			if err == nil {
 				return true, repo, nil
 			}

@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -108,11 +109,10 @@ const (
 	kicBaseImage            = "base-image"
 	ports                   = "ports"
 	startNamespace          = "namespace"
+	targetArch              = "target-architecture"
 )
 
-var (
-	outputFormat string
-)
+var outputFormat string
 
 // initMinikubeFlags includes commandline flags for minikube.
 func initMinikubeFlags() {
@@ -130,7 +130,7 @@ func initMinikubeFlags() {
 	startCmd.Flags().String(humanReadableDiskSize, defaultDiskSize, "Disk size allocated to the minikube VM (format: <number>[<unit>], where unit = b, k, m or g).")
 	startCmd.Flags().Bool(downloadOnly, false, "If true, only download and cache files for later use - don't install or start anything.")
 	startCmd.Flags().Bool(cacheImages, true, "If true, cache docker images for the current bootstrapper and load them into the machine. Always false with --driver=none.")
-	startCmd.Flags().StringSlice(isoURL, download.DefaultISOURLs(), "Locations to fetch the minikube ISO from.")
+	startCmd.Flags().StringSlice(isoURL, download.DefaultISOURLs(runtime.GOARCH), "Locations to fetch the minikube ISO from.")
 	startCmd.Flags().String(kicBaseImage, kic.BaseImage, "The base image to use for docker/podman drivers. Intended for local development.")
 	startCmd.Flags().Bool(keepContext, false, "This will keep the existing kubectl context and will create a minikube context.")
 	startCmd.Flags().Bool(embedCerts, false, "if true, will embed the certs in kubeconfig.")
@@ -152,6 +152,7 @@ func initMinikubeFlags() {
 	startCmd.Flags().Bool(deleteOnFailure, false, "If set, delete the current cluster if start fails and try again. Defaults to false.")
 	startCmd.Flags().Bool(forceSystemd, false, "If set, force the container runtime to use sytemd as cgroup manager. Currently available for docker and crio. Defaults to false.")
 	startCmd.Flags().StringVarP(&outputFormat, "output", "o", "text", "Format to print stdout in. Options include: [text,json]")
+	startCmd.Flags().String(targetArch, "", "Architecture of target machine")
 }
 
 // initKubernetesFlags inits the commandline flags for Kubernetes related options
@@ -259,7 +260,7 @@ func generateClusterConfig(cmd *cobra.Command, existing *config.ClusterConfig, k
 		repository := viper.GetString(imageRepository)
 		mirrorCountry := strings.ToLower(viper.GetString(imageMirrorCountry))
 		if strings.ToLower(repository) == "auto" || (mirrorCountry != "" && repository == "") {
-			found, autoSelectedRepository, err := selectImageRepository(mirrorCountry, semver.MustParse(strings.TrimPrefix(k8sVersion, version.VersionPrefix)))
+			found, autoSelectedRepository, err := selectImageRepository(mirrorCountry, semver.MustParse(strings.TrimPrefix(k8sVersion, version.VersionPrefix)), viper.GetString(targetArch))
 			if err != nil {
 				exit.Error(reason.InetRepo, "Failed to check main repository and mirrors for images", err)
 			}
@@ -289,6 +290,10 @@ func generateClusterConfig(cmd *cobra.Command, existing *config.ClusterConfig, k
 		chosenNetworkPlugin := viper.GetString(networkPlugin)
 		if chosenNetworkPlugin == "cni" {
 			out.WarningT("With --network-plugin=cni, you will need to provide your own CNI. See --cni flag as a user-friendly alternative")
+		}
+
+		if cmd.Flag(targetArch).Changed && !cmd.Flag(isoURL).Changed {
+			cmd.Flag(isoURL).Value.Set(strings.Join(download.DefaultISOURLs(viper.GetString(targetArch)), ","))
 		}
 
 		cc = config.ClusterConfig{
@@ -344,6 +349,7 @@ func generateClusterConfig(cmd *cobra.Command, existing *config.ClusterConfig, k
 				ShouldLoadCachedImages: viper.GetBool(cacheImages),
 				CNI:                    chosenCNI,
 				NodePort:               viper.GetInt(apiServerPort),
+				TargetArch:             viper.GetString(targetArch),
 			},
 		}
 		cc.VerifyComponents = interpretWaitFlag(*cmd)

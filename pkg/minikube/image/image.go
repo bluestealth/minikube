@@ -99,8 +99,8 @@ func ExistsImageInDaemon(img string) bool {
 
 // LoadFromTarball checks if the image exists as a tarball and tries to load it to the local daemon
 // TODO: Pass in if we are loading to docker or podman so this function can also be used for podman
-func LoadFromTarball(binary, img string) error {
-	p := filepath.Join(constants.ImageCacheDir, img)
+func LoadFromTarball(binary, img, arch string) error {
+	p := filepath.Join(constants.ImageCacheDir, arch, img)
 	p = localpath.SanitizeCacheDir(p)
 
 	switch binary {
@@ -120,7 +120,6 @@ func LoadFromTarball(binary, img string) error {
 		_, err = daemon.Write(tag, i)
 		return err
 	}
-
 }
 
 // Tag returns just the image with the tag
@@ -136,9 +135,9 @@ func Tag(img string) string {
 }
 
 // WriteImageToDaemon write img to the local docker daemon
-func WriteImageToDaemon(img string) error {
-	klog.Infof("Writing %s to local daemon", img)
-	ref, err := name.ParseReference(img)
+func WriteImageToDaemon(imgName string) error {
+	klog.Infof("Writing %s to local daemon", imgName)
+	ref, err := name.ParseReference(imgName)
 	if err != nil {
 		return errors.Wrap(err, "parsing reference")
 	}

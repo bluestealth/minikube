@@ -17,8 +17,6 @@ limitations under the License.
 package assets
 
 import (
-	"runtime"
-
 	"k8s.io/minikube/pkg/minikube/config"
 	"k8s.io/minikube/pkg/minikube/constants"
 	"k8s.io/minikube/pkg/minikube/vmpath"
@@ -544,13 +542,12 @@ var Addons = map[string]*Addon{
 
 // GenerateTemplateData generates template data for template assets
 func GenerateTemplateData(cfg config.KubernetesConfig) interface{} {
-
-	a := runtime.GOARCH
+	a := cfg.TargetArch
 	// Some legacy docker images still need the -arch suffix
 	// for  less common architectures blank suffix for amd64
 	ea := ""
-	if runtime.GOARCH != "amd64" {
-		ea = "-" + runtime.GOARCH
+	if a != "amd64" {
+		ea = "-" + a
 	}
 	opts := struct {
 		Arch                      string

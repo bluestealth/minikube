@@ -62,6 +62,7 @@ func PrimaryControlPlane(cc *ClusterConfig) (Node, error) {
 
 	// This config is probably from 1.6 or earlier, let's convert it.
 	cp := Node{
+		Arch:              cc.KubernetesConfig.TargetArch,
 		Name:              cc.KubernetesConfig.NodeName,
 		IP:                cc.KubernetesConfig.NodeIP,
 		Port:              cc.KubernetesConfig.NodePort,
@@ -89,7 +90,7 @@ func ProfileNameValid(name string) bool {
 	// RestrictedNamePattern describes the characters allowed to represent a profile's name
 	const RestrictedNamePattern = `(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])`
 
-	var validName = regexp.MustCompile(`^` + RestrictedNamePattern + `$`)
+	validName := regexp.MustCompile(`^` + RestrictedNamePattern + `$`)
 	// length needs to be more than 1 character because docker volume #9366
 	return validName.MatchString(name) && len(name) > 1
 }
@@ -148,13 +149,13 @@ func SaveProfile(name string, cfg *ClusterConfig, miniHome ...string) error {
 	}
 	path := profileFilePath(name, miniHome...)
 	klog.Infof("Saving config to %s ...", path)
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 
 	// If no config file exists, don't worry about swapping paths
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := lock.WriteFile(path, data, 0600); err != nil {
+		if err := lock.WriteFile(path, data, 0o600); err != nil {
 			return err
 		}
 		return nil
@@ -166,7 +167,7 @@ func SaveProfile(name string, cfg *ClusterConfig, miniHome ...string) error {
 	}
 	defer os.Remove(tf.Name())
 
-	if err = ioutil.WriteFile(tf.Name(), data, 0600); err != nil {
+	if err = ioutil.WriteFile(tf.Name(), data, 0o600); err != nil {
 		return err
 	}
 
@@ -198,7 +199,6 @@ func DeleteProfile(profile string, miniHome ...string) error {
 // invalidPs are the profiles that have a directory or config file but not usable
 // invalidPs would be suggested to be deleted
 func ListProfiles(miniHome ...string) (validPs []*Profile, inValidPs []*Profile, err error) {
-
 	// try to get profiles list based on left over evidences such as directory
 	pDirs, err := profileDirs(miniHome...)
 	if err != nil {

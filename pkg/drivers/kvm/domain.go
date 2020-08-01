@@ -188,7 +188,9 @@ func (d *Driver) createDomain() (*libvirt.Domain, error) {
 		return nil, errors.Wrap(err, "error getting host capabilities")
 	}
 
-	d.Platform = capabilities.Host.CPU.Arch
+	if d.Platform == "" {
+		d.Platform = capabilities.Host.CPU.Arch
+	}
 	d.PlatformType = GetPlatformOSType(capabilities, d.Platform)
 	d.PlatformMachine = GetPlatformMachine(capabilities, d.Platform)
 	d.VirtualizationType = GetVirtualizationType(capabilities, d.Platform)

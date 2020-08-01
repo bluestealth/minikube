@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
-	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -56,7 +55,7 @@ func TransferBinaries(cfg config.KubernetesConfig, c command.Runner, sm sysinit.
 	for _, name := range constants.KubernetesReleaseBinaries {
 		name := name
 		g.Go(func() error {
-			src, err := download.Binary(name, cfg.KubernetesVersion, "linux", runtime.GOARCH)
+			src, err := download.Binary(name, cfg.KubernetesVersion, "linux", cfg.TargetArch)
 			if err != nil {
 				return errors.Wrapf(err, "downloading %s", name)
 			}

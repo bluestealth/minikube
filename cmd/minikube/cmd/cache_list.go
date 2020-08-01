@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"os"
+	"runtime"
 	"text/template"
 
 	"github.com/spf13/cobra"
@@ -28,7 +29,7 @@ import (
 
 const defaultCacheListFormat = "{{.CacheImage}}\n"
 
-var cacheListFormat string
+var cacheListFormat, architecture string
 
 // CacheListTemplate represents the cache list template
 type CacheListTemplate struct {
@@ -41,7 +42,7 @@ var listCacheCmd = &cobra.Command{
 	Short: "List all available images from the local cache.",
 	Long:  "List all available images from the local cache.",
 	Run: func(cmd *cobra.Command, args []string) {
-		images, err := cmdConfig.ListConfigMap(cacheImageConfigKey)
+		images, err := cmdConfig.ListConfigMap(cacheImageConfigKey, architecture)
 		if err != nil {
 			exit.Error(reason.InternalListConfig, "Failed to get image map", err)
 		}
@@ -55,6 +56,7 @@ func init() {
 	listCacheCmd.Flags().StringVar(&cacheListFormat, "format", defaultCacheListFormat,
 		`Go template format string for the cache list output.  The format for Go templates can be found here: https://golang.org/pkg/text/template/
 For the list of accessible variables for the template, see the struct values here: https://godoc.org/k8s.io/minikube/cmd/minikube/cmd#CacheListTemplate`)
+	listCacheCmd.Flags().StringVar(&architecture, "target-architecture", runtime.GOARCH, "target architecture for cached container")
 	cacheCmd.AddCommand(listCacheCmd)
 }
 

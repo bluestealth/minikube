@@ -93,6 +93,7 @@ type KubernetesConfig struct {
 	LoadBalancerStartIP string // currently only used by MetalLB addon
 	LoadBalancerEndIP   string // currently only used by MetalLB addon
 	ExtraOptions        ExtraOptionSlice
+	TargetArch          string
 
 	ShouldLoadCachedImages bool
 
@@ -108,6 +109,7 @@ type KubernetesConfig struct {
 // Node contains information about specific nodes in a cluster
 type Node struct {
 	Name              string
+	Arch              string
 	IP                string
 	Port              int
 	KubernetesVersion string

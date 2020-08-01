@@ -75,10 +75,10 @@ func SaveToDir(images []string, cacheDir string) error {
 }
 
 // saveToTarFile caches an image
-func saveToTarFile(iname, rawDest string) error {
+func saveToTarFile(imgName, rawDest string) error {
 	start := time.Now()
 	defer func() {
-		klog.Infof("cache image %q -> %q took %s", iname, rawDest, time.Since(start))
+		klog.Infof("cache image %q -> %q took %s", imgName, rawDest, time.Since(start))
 	}()
 
 	// OS-specific mangling of destination path
@@ -101,16 +101,16 @@ func saveToTarFile(iname, rawDest string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o777); err != nil {
 		return errors.Wrapf(err, "making cache image directory: %s", dst)
 	}
 
-	ref, err := name.ParseReference(iname, name.WeakValidation)
+	ref, err := name.ParseReference(imgName, name.WeakValidation)
 	if err != nil {
-		return errors.Wrapf(err, "parsing image ref name for %s", iname)
+		return errors.Wrapf(err, "parsing image ref name for %s", imgName)
 	}
 	if ref == nil {
-		return errors.Wrapf(err, "nil reference for %s", iname)
+		return errors.Wrapf(err, "nil reference for %s", imgName)
 	}
 
 	img, err := retrieveImage(ref)
@@ -118,7 +118,7 @@ func saveToTarFile(iname, rawDest string) error {
 		klog.Warningf("unable to retrieve image: %v", err)
 	}
 	if img == nil {
-		return errors.Wrapf(err, "nil image for %s", iname)
+		return errors.Wrapf(err, "nil image for %s", imgName)
 	}
 
 	err = writeImage(img, dst, ref)

@@ -176,7 +176,7 @@ func (k *Bootstrapper) init(cfg config.ClusterConfig) error {
 	}
 
 	extraFlags := bsutil.CreateFlagsFromExtraArgs(cfg.KubernetesConfig.ExtraOptions)
-	r, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c})
+	r, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c, Arch: cfg.KubernetesConfig.TargetArch})
 	if err != nil {
 		return err
 	}
@@ -300,7 +300,7 @@ func (k *Bootstrapper) applyCNI(cfg config.ClusterConfig) error {
 
 // unpause unpauses any Kubernetes backplane components
 func (k *Bootstrapper) unpause(cfg config.ClusterConfig) error {
-	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c})
+	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c, Arch: cfg.KubernetesConfig.TargetArch})
 	if err != nil {
 		return err
 	}
@@ -424,7 +424,7 @@ func (k *Bootstrapper) WaitForNode(cfg config.ClusterConfig, n config.Node, time
 		return nil
 	}
 
-	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c})
+	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c, Arch: cfg.KubernetesConfig.TargetArch})
 	if err != nil {
 		return errors.Wrapf(err, "create runtme-manager %s", cfg.KubernetesConfig.ContainerRuntime)
 	}
@@ -462,7 +462,6 @@ func (k *Bootstrapper) WaitForNode(cfg config.ClusterConfig, n config.Node, time
 		if err := kverify.WaitForService(k.c, "kubelet", timeout); err != nil {
 			return errors.Wrap(err, "waiting for kubelet")
 		}
-
 	}
 
 	if cfg.VerifyComponents[kverify.NodeReadyKey] {
@@ -612,7 +611,7 @@ func (k *Bootstrapper) restartControlPlane(cfg config.ClusterConfig) error {
 		}
 	}
 
-	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c})
+	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c, Arch: cfg.KubernetesConfig.TargetArch})
 	if err != nil {
 		return errors.Wrap(err, "runtime")
 	}
@@ -715,7 +714,7 @@ func (k *Bootstrapper) GenerateToken(cc config.ClusterConfig) (string, error) {
 
 // DeleteCluster removes the components that were started earlier
 func (k *Bootstrapper) DeleteCluster(k8s config.KubernetesConfig) error {
-	cr, err := cruntime.New(cruntime.Config{Type: k8s.ContainerRuntime, Runner: k.c, Socket: k8s.CRISocket})
+	cr, err := cruntime.New(cruntime.Config{Type: k8s.ContainerRuntime, Runner: k.c, Socket: k8s.CRISocket, Arch: k8s.TargetArch})
 	if err != nil {
 		return errors.Wrap(err, "runtime")
 	}
@@ -766,7 +765,7 @@ func (k *Bootstrapper) SetupCerts(k8s config.KubernetesConfig, n config.Node) er
 
 // UpdateCluster updates the control plane with cluster-level info.
 func (k *Bootstrapper) UpdateCluster(cfg config.ClusterConfig) error {
-	images, err := images.Kubeadm(cfg.KubernetesConfig.ImageRepository, cfg.KubernetesConfig.KubernetesVersion)
+	images, err := images.Kubeadm(cfg.KubernetesConfig.ImageRepository, cfg.KubernetesConfig.KubernetesVersion, cfg.KubernetesConfig.TargetArch)
 	if err != nil {
 		return errors.Wrap(err, "kubeadm images")
 	}
@@ -774,6 +773,7 @@ func (k *Bootstrapper) UpdateCluster(cfg config.ClusterConfig) error {
 	r, err := cruntime.New(cruntime.Config{
 		Type:   cfg.KubernetesConfig.ContainerRuntime,
 		Runner: k.c, Socket: cfg.KubernetesConfig.CRISocket,
+		Arch: cfg.KubernetesConfig.TargetArch,
 	})
 	if err != nil {
 		return errors.Wrap(err, "runtime")
@@ -784,7 +784,7 @@ func (k *Bootstrapper) UpdateCluster(cfg config.ClusterConfig) error {
 	}
 
 	if cfg.KubernetesConfig.ShouldLoadCachedImages {
-		if err := machine.LoadImages(&cfg, k.c, images, constants.ImageCacheDir); err != nil {
+		if err := machine.LoadImages(&cfg, k.c, images, path.Join(constants.ImageCacheDir, cfg.KubernetesConfig.TargetArch)); err != nil {
 			out.FailureT("Unable to load cached images: {{.error}}", out.V{"error": err})
 		}
 	}
@@ -943,7 +943,11 @@ func (k *Bootstrapper) elevateKubeSystemPrivileges(cfg config.ClusterConfig) err
 // stopKubeSystem stops all the containers in the kube-system to prevent #8740 when doing hot upgrade
 func (k *Bootstrapper) stopKubeSystem(cfg config.ClusterConfig) error {
 	klog.Info("stopping kube-system containers ...")
-	cr, err := cruntime.New(cruntime.Config{Type: cfg.KubernetesConfig.ContainerRuntime, Runner: k.c})
+	cr, err := cruntime.New(cruntime.Config{
+		Type:   cfg.KubernetesConfig.ContainerRuntime,
+		Runner: k.c,
+		Arch:   cfg.KubernetesConfig.TargetArch,
+	})
 	if err != nil {
 		return errors.Wrap(err, "new cruntime")
 	}
