@@ -19,7 +19,10 @@ limitations under the License.
 package kvm
 
 import (
-	"github.com/libvirt/libvirt-go"
+	"regexp"
+	"strings"
+
+	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
 
@@ -39,7 +42,7 @@ func GetDomainCapabilities(conn *libvirt.Connect, emulator, arch, machine, virtT
 	if err != nil {
 		return
 	}
-	capabilities.Unmarshal(xmlString)
+	err = capabilities.Unmarshal(xmlString)
 	return
 }
 
@@ -117,5 +120,28 @@ func DomainHasNVRAM(dom *libvirt.Domain) (hasNvram bool, err error) {
 		return
 	}
 	hasNvram = domain.OS.NVRam != nil
+	return
+}
+
+func GetLoader(osLoader *libvirtxml.DomainCapsOSLoader, platform string) (loader string) {
+	if osLoader == nil || len(osLoader.Values) == 0 {
+		return
+	}
+	var re *regexp.Regexp
+	// libvirt isn't very intelligent about the loaders it lists for platforms
+	switch platform {
+	case "x86_64":
+		re = regexp.MustCompile("OVMF|ovmf|x86_64|x64")
+	case "aarch64":
+		re = regexp.MustCompile("AAVMF|aarch64")
+	default:
+		return
+	}
+	for _, osLoader := range osLoader.Values {
+		// our efi binaries are not signed, prefer unsigned loaders
+		if re.MatchString(osLoader) && (loader == "" || !strings.Contains(osLoader,"secure")) {
+			loader = osLoader
+		}
+	}
 	return
 }
