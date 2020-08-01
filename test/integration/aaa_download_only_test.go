@@ -73,9 +73,9 @@ func TestDownloadOnly(t *testing.T) {
 
 					// skip for none, as none driver does not have preload feature.
 					if !NoneDriver() {
-						if download.PreloadExists(v, r, true) {
+						if download.PreloadExists(v, r, runtime.GOARCH, true) {
 							// Just make sure the tarball path exists
-							if _, err := os.Stat(download.TarballPath(v, r)); err != nil {
+							if _, err := os.Stat(download.TarballPath(v, r, runtime.GOARCH)); err != nil {
 								t.Errorf("failed to verify preloaded tarball file exists: %v", err)
 							}
 							return
@@ -173,16 +173,16 @@ func TestDownloadOnlyKic(t *testing.T) {
 	}
 
 	// Make sure the downloaded image tarball exists
-	tarball := download.TarballPath(constants.DefaultKubernetesVersion, cRuntime)
+	tarball := download.TarballPath(constants.DefaultKubernetesVersion, cRuntime, runtime.GOARCH)
 	contents, err := ioutil.ReadFile(tarball)
 	if err != nil {
 		t.Errorf("failed to read tarball file %q: %v", tarball, err)
 	}
 	// Make sure it has the correct checksum
 	checksum := md5.Sum(contents)
-	remoteChecksum, err := ioutil.ReadFile(download.PreloadChecksumPath(constants.DefaultKubernetesVersion, cRuntime))
+	remoteChecksum, err := ioutil.ReadFile(download.PreloadChecksumPath(constants.DefaultKubernetesVersion, cRuntime, runtime.GOARCH))
 	if err != nil {
-		t.Errorf("failed to read checksum file %q : %v", download.PreloadChecksumPath(constants.DefaultKubernetesVersion, cRuntime), err)
+		t.Errorf("failed to read checksum file %q : %v", download.PreloadChecksumPath(constants.DefaultKubernetesVersion, cRuntime, runtime.GOARCH), err)
 	}
 	if string(remoteChecksum) != string(checksum[:]) {
 		t.Errorf("failed to verify checksum. checksum of %q does not match remote checksum (%q != %q)", tarball, string(remoteChecksum), string(checksum[:]))

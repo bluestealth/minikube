@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"runtime/debug"
 	"strings"
 
@@ -76,7 +77,7 @@ func main() {
 
 	for _, kv := range k8sVersions {
 		for _, cr := range containerRuntimes {
-			tf := download.TarballName(kv, cr)
+			tf := download.TarballName(kv, cr, runtime.GOARCH)
 			if download.PreloadExists(kv, cr) {
 				fmt.Printf("A preloaded tarball for k8s version %s - runtime %q already exists, skipping generation.\n", kv, cr)
 				continue

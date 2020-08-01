@@ -20,46 +20,45 @@ package images
 import (
 	"fmt"
 	"path"
-	"runtime"
 
 	"github.com/blang/semver"
 	"k8s.io/minikube/pkg/version"
 )
 
 // Pause returns the image name to pull for a given Kubernetes version
-func Pause(v semver.Version, mirror string) string {
+func Pause(v semver.Version, mirror, arch string) string {
 	// Should match `PauseVersion` in:
 	// https://github.com/kubernetes/kubernetes/blob/master/cmd/kubeadm/app/constants/constants.go
 	pv := "3.2"
 	if semver.MustParseRange("<1.18.0-alpha.0")(v) {
 		pv = "3.1"
 	}
-	return path.Join(kubernetesRepo(mirror), "pause"+archTag(false)+pv)
+	return path.Join(kubernetesRepo(mirror), "pause"+archTag(false, arch)+pv)
 }
 
 // essentials returns images needed too bootstrap a kubenretes
-func essentials(mirror string, v semver.Version) []string {
+func essentials(mirror string, v semver.Version, arch string) []string {
 	imgs := []string{
-		componentImage("kube-proxy", v, mirror),
-		componentImage("kube-scheduler", v, mirror),
-		componentImage("kube-controller-manager", v, mirror),
-		componentImage("kube-apiserver", v, mirror),
+		componentImage("kube-proxy", v, mirror, arch),
+		componentImage("kube-scheduler", v, mirror, arch),
+		componentImage("kube-controller-manager", v, mirror, arch),
+		componentImage("kube-apiserver", v, mirror, arch),
 		coreDNS(v, mirror),
-		etcd(v, mirror),
-		Pause(v, mirror),
+		etcd(v, mirror, arch),
+		Pause(v, mirror, arch),
 	}
 	return imgs
 }
 
 // componentImage returns a Kubernetes component image to pull
-func componentImage(name string, v semver.Version, mirror string) string {
+func componentImage(name string, v semver.Version, mirror string, arch string) string {
 	needsArchSuffix := false
 	ancient := semver.MustParseRange("<1.12.0")
 	if ancient(v) {
 		needsArchSuffix = true
 	}
 
-	return fmt.Sprintf("%sv%s", path.Join(kubernetesRepo(mirror), name+archTag(needsArchSuffix)), v)
+	return fmt.Sprintf("%sv%s", path.Join(kubernetesRepo(mirror), name+archTag(needsArchSuffix, arch)), v)
 }
 
 // coreDNS returns the images used for CoreDNS
@@ -87,7 +86,7 @@ func coreDNS(v semver.Version, mirror string) string {
 }
 
 // etcd returns the image used for etcd
-func etcd(v semver.Version, mirror string) string {
+func etcd(v semver.Version, mirror string, arch string) string {
 	needsArchSuffix := false
 	ancient := semver.MustParseRange("<1.12.0")
 	if ancient(v) {
@@ -116,21 +115,21 @@ func etcd(v semver.Version, mirror string) string {
 		ev = "3.4.9-1"
 	}
 
-	return path.Join(kubernetesRepo(mirror), "etcd"+archTag(needsArchSuffix)+ev)
+	return path.Join(kubernetesRepo(mirror), "etcd"+archTag(needsArchSuffix, arch)+ev)
 }
 
 // archTag returns a CPU architecture suffix for images
-func archTag(hasTag bool) string {
-	if runtime.GOARCH == "amd64" && !hasTag {
+func archTag(hasTag bool, arch string) string {
+	if arch == "amd64" && !hasTag {
 		return ":"
 	}
-	return "-" + runtime.GOARCH + ":"
+	return "-" + arch + ":"
 }
 
 // auxiliary returns images that are helpful for running minikube
-func auxiliary(mirror string) []string {
+func auxiliary(mirror string, arch string) []string {
 	return []string{
-		storageProvisioner(mirror),
+		storageProvisioner(mirror, arch),
 		dashboardFrontend(mirror),
 		dashboardMetrics(mirror),
 		// NOTE: kindnet is also used when the Docker driver is used with a non-Docker runtime
@@ -138,8 +137,8 @@ func auxiliary(mirror string) []string {
 }
 
 // storageProvisioner returns the minikube storage provisioner image
-func storageProvisioner(mirror string) string {
-	return path.Join(minikubeRepo(mirror), "storage-provisioner"+archTag(false)+version.GetStorageProvisionerVersion())
+func storageProvisioner(mirror, arch string) string {
+	return path.Join(minikubeRepo(mirror), "storage-provisioner"+archTag(false, arch)+version.GetStorageProvisionerVersion())
 }
 
 // dashboardFrontend returns the image used for the dashboard frontend

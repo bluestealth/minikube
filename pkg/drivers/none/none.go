@@ -54,6 +54,7 @@ type Driver struct {
 
 // Config is configuration for the None driver
 type Config struct {
+	Arch             string
 	MachineName      string
 	StorePath        string
 	ContainerRuntime string
@@ -62,7 +63,7 @@ type Config struct {
 // NewDriver returns a fully configured None driver
 func NewDriver(c Config) *Driver {
 	runner := command.NewExecRunner()
-	runtime, err := cruntime.New(cruntime.Config{Type: c.ContainerRuntime, Runner: runner})
+	runtime, err := cruntime.New(cruntime.Config{Type: c.ContainerRuntime, Runner: runner, Arch: c.Arch})
 	// Libraries shouldn't panic, but there is no way for drivers to return error :(
 	if err != nil {
 		klog.Fatalf("unable to create container runtime: %v", err)

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -141,13 +142,13 @@ func (d *Driver) Create() error {
 	go func() {
 		defer waitForPreload.Done()
 		// If preload doesn't exist, don't bother extracting tarball to volume
-		if !download.PreloadExists(d.NodeConfig.KubernetesVersion, d.NodeConfig.ContainerRuntime) {
+		if !download.PreloadExists(d.NodeConfig.KubernetesVersion, d.NodeConfig.ContainerRuntime, runtime.GOARCH) {
 			return
 		}
 		t := time.Now()
 		klog.Infof("Starting extracting preloaded images to volume ...")
 		// Extract preloaded images to container
-		if err := oci.ExtractTarballToVolume(d.NodeConfig.OCIBinary, download.TarballPath(d.NodeConfig.KubernetesVersion, d.NodeConfig.ContainerRuntime), params.Name, d.NodeConfig.ImageDigest); err != nil {
+		if err := oci.ExtractTarballToVolume(d.NodeConfig.OCIBinary, download.TarballPath(d.NodeConfig.KubernetesVersion, d.NodeConfig.ContainerRuntime, runtime.GOARCH), params.Name, d.NodeConfig.ImageDigest); err != nil {
 			if strings.Contains(err.Error(), "No space left on device") {
 				pErr = oci.ErrInsufficientDockerStorage
 				return
@@ -382,7 +383,7 @@ func (d *Driver) Stop() error {
 		}
 	}
 
-	runtime, err := cruntime.New(cruntime.Config{Type: d.NodeConfig.ContainerRuntime, Runner: d.exec})
+	runtime, err := cruntime.New(cruntime.Config{Type: d.NodeConfig.ContainerRuntime, Runner: d.exec, Arch: runtime.GOARCH})
 	if err != nil { // won't return error because:
 		// even though we can't stop the cotainers inside, we still wanna stop the minikube container itself
 		klog.Errorf("unable to get container runtime: %v", err)

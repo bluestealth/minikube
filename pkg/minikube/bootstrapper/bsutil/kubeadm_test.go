@@ -19,6 +19,7 @@ package bsutil
 import (
 	"fmt"
 	"io/ioutil"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -123,7 +124,7 @@ func TestGenerateKubeadmYAMLDNS(t *testing.T) {
 	}
 	for _, version := range versions {
 		for _, tc := range tests {
-			runtime, err := cruntime.New(cruntime.Config{Type: tc.runtime, Runner: fcr})
+			runtime, err := cruntime.New(cruntime.Config{Type: tc.runtime, Runner: fcr, Arch: runtime.GOARCH})
 			if err != nil {
 				t.Fatalf("runtime: %v", err)
 			}
@@ -203,7 +204,7 @@ func TestGenerateKubeadmYAML(t *testing.T) {
 	}
 	for _, version := range versions {
 		for _, tc := range tests {
-			runtime, err := cruntime.New(cruntime.Config{Type: tc.runtime, Runner: fcr})
+			runtime, err := cruntime.New(cruntime.Config{Type: tc.runtime, Runner: fcr, Arch: runtime.GOARCH})
 			if err != nil {
 				t.Fatalf("runtime: %v", err)
 			}

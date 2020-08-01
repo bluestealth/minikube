@@ -113,6 +113,8 @@ type Manager interface {
 
 // Config is runtime configuration
 type Config struct {
+	// Platform Architecture of Runtime
+	Arch string
 	// Type of runtime to create ("docker, "crio", etc)
 	Type string
 	// Custom path to a socket file

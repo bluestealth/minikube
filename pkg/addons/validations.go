@@ -46,7 +46,7 @@ You can enable 'volumesnapshots' addon by running: 'minikube addons enable volum
 
 // IsRuntimeContainerd is a validator which returns an error if the current runtime is not containerd
 func IsRuntimeContainerd(cc *config.ClusterConfig, _, _ string) error {
-	r, err := cruntime.New(cruntime.Config{Type: cc.KubernetesConfig.ContainerRuntime})
+	r, err := cruntime.New(cruntime.Config{Type: cc.KubernetesConfig.ContainerRuntime, Arch: cc.KubernetesConfig.TargetArch})
 	if err != nil {
 		return err
 	}

@@ -145,7 +145,7 @@ func Start(starter Starter, apiServer bool) (*kubeconfig.Settings, error) {
 
 	wg.Add(1)
 	go func() {
-		if err := CacheAndLoadImagesInConfig(); err != nil {
+		if err := CacheAndLoadImagesInConfig(starter.Cfg.KubernetesConfig.TargetArch); err != nil {
 			out.FailureT("Unable to push cached images: {{.error}}", out.V{"error": err})
 		}
 		wg.Done()
@@ -222,7 +222,7 @@ func Provision(cc *config.ClusterConfig, n *config.Node, apiServer bool, delOnFa
 	}
 
 	if !driver.BareMetal(cc.Driver) {
-		beginCacheKubernetesImages(&cacheGroup, cc.KubernetesConfig.ImageRepository, n.KubernetesVersion, cc.KubernetesConfig.ContainerRuntime)
+		beginCacheKubernetesImages(&cacheGroup, cc.KubernetesConfig.ImageRepository, n.KubernetesVersion, cc.KubernetesConfig.ContainerRuntime, cc.KubernetesConfig.TargetArch)
 	}
 
 	// Abstraction leakage alert: startHost requires the config to be saved, to satistfy pkg/provision/buildroot.
@@ -231,7 +231,7 @@ func Provision(cc *config.ClusterConfig, n *config.Node, apiServer bool, delOnFa
 		return nil, false, nil, nil, errors.Wrap(err, "Failed to save config")
 	}
 
-	handleDownloadOnly(&cacheGroup, &kicGroup, n.KubernetesVersion)
+	handleDownloadOnly(&cacheGroup, &kicGroup, n.KubernetesVersion, n.Arch)
 	waitDownloadKicBaseImage(&kicGroup)
 
 	return startMachine(cc, n, delOnFail)
@@ -240,6 +240,7 @@ func Provision(cc *config.ClusterConfig, n *config.Node, apiServer bool, delOnFa
 // ConfigureRuntimes does what needs to happen to get a runtime going.
 func configureRuntimes(runner cruntime.CommandRunner, cc config.ClusterConfig, kv semver.Version) cruntime.Manager {
 	co := cruntime.Config{
+		Arch:              cc.KubernetesConfig.TargetArch,
 		Type:              cc.KubernetesConfig.ContainerRuntime,
 		Runner:            runner,
 		ImageRepository:   cc.KubernetesConfig.ImageRepository,
@@ -266,7 +267,7 @@ func configureRuntimes(runner cruntime.CommandRunner, cc config.ClusterConfig, k
 				klog.Warningf("%s preload failed: %v, falling back to caching images", cr.Name(), err)
 			}
 
-			if err := machine.CacheImagesForBootstrapper(cc.KubernetesConfig.ImageRepository, cc.KubernetesConfig.KubernetesVersion, viper.GetString(cmdcfg.Bootstrapper)); err != nil {
+			if err := machine.CacheImagesForBootstrapper(cc.KubernetesConfig.ImageRepository, cc.KubernetesConfig.KubernetesVersion, viper.GetString(cmdcfg.Bootstrapper), cc.KubernetesConfig.TargetArch); err != nil {
 				exit.Error(reason.RuntimeCache, "Failed to cache images", err)
 			}
 		}

@@ -63,7 +63,7 @@ func extraKubeletOpts(mc config.ClusterConfig, nc config.Node, r cruntime.Manage
 		extraOpts["hostname-override"] = nodeName
 	}
 
-	pauseImage := images.Pause(version, k8s.ImageRepository)
+	pauseImage := images.Pause(version, k8s.ImageRepository, k8s.TargetArch)
 	if _, ok := extraOpts["pod-infra-container-image"]; !ok && k8s.ImageRepository != "" && pauseImage != "" && k8s.ContainerRuntime != remoteContainerRuntime {
 		extraOpts["pod-infra-container-image"] = pauseImage
 	}

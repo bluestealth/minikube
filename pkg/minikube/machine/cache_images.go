@@ -49,13 +49,13 @@ var loadRoot = path.Join(vmpath.GuestPersistentDir, "images")
 var loadImageLock sync.Mutex
 
 // CacheImagesForBootstrapper will cache images for a bootstrapper
-func CacheImagesForBootstrapper(imageRepository string, version string, clusterBootstrapper string) error {
-	images, err := bootstrapper.GetCachedImageList(imageRepository, version, clusterBootstrapper)
+func CacheImagesForBootstrapper(imageRepository string, version string, clusterBootstrapper string, arch string) error {
+	images, err := bootstrapper.GetCachedImageList(imageRepository, version, clusterBootstrapper, arch)
 	if err != nil {
 		return errors.Wrap(err, "cached images list")
 	}
 
-	if err := image.SaveToDir(images, constants.ImageCacheDir); err != nil {
+	if err := image.SaveToDir(images, path.Join(constants.ImageCacheDir, arch)); err != nil {
 		return errors.Wrapf(err, "Caching images for %s", clusterBootstrapper)
 	}
 
@@ -64,7 +64,11 @@ func CacheImagesForBootstrapper(imageRepository string, version string, clusterB
 
 // LoadImages loads previously cached images into the container runtime
 func LoadImages(cc *config.ClusterConfig, runner command.Runner, images []string, cacheDir string) error {
-	cr, err := cruntime.New(cruntime.Config{Type: cc.KubernetesConfig.ContainerRuntime, Runner: runner})
+	cr, err := cruntime.New(cruntime.Config{
+		Type:   cc.KubernetesConfig.ContainerRuntime,
+		Runner: runner,
+		Arch:   cc.KubernetesConfig.TargetArch,
+	})
 	if err != nil {
 		return errors.Wrap(err, "runtime")
 	}
@@ -102,6 +106,7 @@ func LoadImages(cc *config.ClusterConfig, runner command.Runner, images []string
 			if err == nil {
 				return nil
 			}
+
 			klog.Infof("%q needs transfer: %v", image, err)
 			return transferAndLoadImage(runner, cc.KubernetesConfig, image, cacheDir)
 		})
@@ -159,13 +164,13 @@ func needsTransfer(imgClient *client.Client, imgName string, cr cruntime.Manager
 }
 
 // CacheAndLoadImages caches and loads images to all profiles
-func CacheAndLoadImages(images []string) error {
+func CacheAndLoadImages(images []string, arch string) error {
 	if len(images) == 0 {
 		return nil
 	}
 
 	// This is the most important thing
-	if err := image.SaveToDir(images, constants.ImageCacheDir); err != nil {
+	if err := image.SaveToDir(images, path.Join(constants.ImageCacheDir, arch)); err != nil {
 		return errors.Wrap(err, "save to dir")
 	}
 
@@ -214,7 +219,7 @@ func CacheAndLoadImages(images []string) error {
 				if err != nil {
 					return err
 				}
-				err = LoadImages(c, cr, images, constants.ImageCacheDir)
+				err = LoadImages(c, cr, images, path.Join(constants.ImageCacheDir, arch))
 				if err != nil {
 					failed = append(failed, m)
 					klog.Warningf("Failed to load cached images for profile %s. make sure the profile is running. %v", pName, err)
@@ -232,7 +237,7 @@ func CacheAndLoadImages(images []string) error {
 
 // transferAndLoadImage transfers and loads a single image from the cache
 func transferAndLoadImage(cr command.Runner, k8s config.KubernetesConfig, imgName string, cacheDir string) error {
-	r, err := cruntime.New(cruntime.Config{Type: k8s.ContainerRuntime, Runner: cr})
+	r, err := cruntime.New(cruntime.Config{Type: k8s.ContainerRuntime, Runner: cr, Arch: k8s.TargetArch})
 	if err != nil {
 		return errors.Wrap(err, "runtime")
 	}

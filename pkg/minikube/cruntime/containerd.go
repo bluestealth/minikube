@@ -117,6 +117,7 @@ oom_score = 0
 
 // Containerd contains containerd runtime state
 type Containerd struct {
+	Arch              string
 	Socket            string
 	Runner            CommandRunner
 	ImageRepository   string
@@ -172,13 +173,13 @@ func (r *Containerd) Available() error {
 }
 
 // generateContainerdConfig sets up /etc/containerd/config.toml
-func generateContainerdConfig(cr CommandRunner, imageRepository string, kv semver.Version) error {
+func generateContainerdConfig(cr CommandRunner, imageRepository string, kv semver.Version, arch string) error {
 	cPath := containerdConfigFile
 	t, err := template.New("containerd.config.toml").Parse(containerdConfigTemplate)
 	if err != nil {
 		return err
 	}
-	pauseImage := images.Pause(kv, imageRepository)
+	pauseImage := images.Pause(kv, imageRepository, arch)
 	opts := struct{ PodInfraContainerImage string }{PodInfraContainerImage: pauseImage}
 	var b bytes.Buffer
 	if err := t.Execute(&b, opts); err != nil {
@@ -201,7 +202,7 @@ func (r *Containerd) Enable(disOthers, _ bool) error {
 	if err := populateCRIConfig(r.Runner, r.SocketPath()); err != nil {
 		return err
 	}
-	if err := generateContainerdConfig(r.Runner, r.ImageRepository, r.KubernetesVersion); err != nil {
+	if err := generateContainerdConfig(r.Runner, r.ImageRepository, r.KubernetesVersion, r.Arch); err != nil {
 		return err
 	}
 	if err := enableIPForwarding(r.Runner); err != nil {
@@ -306,15 +307,16 @@ func (r *Containerd) SystemLogCmd(len int) string {
 
 // Preload preloads the container runtime with k8s images
 func (r *Containerd) Preload(cfg config.KubernetesConfig) error {
-	if !download.PreloadExists(cfg.KubernetesVersion, cfg.ContainerRuntime) {
+	if !download.PreloadExists(cfg.KubernetesVersion, cfg.ContainerRuntime, cfg.TargetArch) {
 		return nil
 	}
 
 	k8sVersion := cfg.KubernetesVersion
 	cRuntime := cfg.ContainerRuntime
+	archName := cfg.TargetArch
 
 	// If images already exist, return
-	images, err := images.Kubeadm(cfg.ImageRepository, k8sVersion)
+	images, err := images.Kubeadm(cfg.ImageRepository, k8sVersion, cfg.TargetArch)
 	if err != nil {
 		return errors.Wrap(err, "getting images")
 	}
@@ -323,7 +325,7 @@ func (r *Containerd) Preload(cfg config.KubernetesConfig) error {
 		return nil
 	}
 
-	tarballPath := download.TarballPath(k8sVersion, cRuntime)
+	tarballPath := download.TarballPath(k8sVersion, cRuntime, archName)
 	targetDir := "/"
 	targetName := "preloaded.tar.lz4"
 	dest := path.Join(targetDir, targetName)

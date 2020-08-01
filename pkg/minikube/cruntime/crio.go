@@ -44,6 +44,7 @@ const (
 
 // CRIO contains CRIO runtime state
 type CRIO struct {
+	Arch              string
 	Socket            string
 	Runner            CommandRunner
 	ImageRepository   string
@@ -52,9 +53,9 @@ type CRIO struct {
 }
 
 // generateCRIOConfig sets up /etc/crio/crio.conf
-func generateCRIOConfig(cr CommandRunner, imageRepository string, kv semver.Version) error {
+func generateCRIOConfig(cr CommandRunner, imageRepository string, kv semver.Version, arch string) error {
 	cPath := crioConfigFile
-	pauseImage := images.Pause(kv, imageRepository)
+	pauseImage := images.Pause(kv, imageRepository, arch)
 
 	c := exec.Command("/bin/bash", "-c", fmt.Sprintf("sudo sed -e 's|^pause_image = .*$|pause_image = \"%s\"|' -i %s", pauseImage, cPath))
 	if _, err := cr.RunCmd(c); err != nil {
@@ -119,7 +120,7 @@ func (r *CRIO) Enable(disOthers, _ bool) error {
 	if err := populateCRIConfig(r.Runner, r.SocketPath()); err != nil {
 		return err
 	}
-	if err := generateCRIOConfig(r.Runner, r.ImageRepository, r.KubernetesVersion); err != nil {
+	if err := generateCRIOConfig(r.Runner, r.ImageRepository, r.KubernetesVersion, r.Arch); err != nil {
 		return err
 	}
 	if err := enableIPForwarding(r.Runner); err != nil {
@@ -224,7 +225,7 @@ func (r *CRIO) SystemLogCmd(len int) string {
 
 // Preload preloads the container runtime with k8s images
 func (r *CRIO) Preload(cfg config.KubernetesConfig) error {
-	if !download.PreloadExists(cfg.KubernetesVersion, cfg.ContainerRuntime) {
+	if !download.PreloadExists(cfg.KubernetesVersion, cfg.ContainerRuntime, cfg.TargetArch) {
 		return nil
 	}
 
@@ -232,7 +233,7 @@ func (r *CRIO) Preload(cfg config.KubernetesConfig) error {
 	cRuntime := cfg.ContainerRuntime
 
 	// If images already exist, return
-	images, err := images.Kubeadm(cfg.ImageRepository, k8sVersion)
+	images, err := images.Kubeadm(cfg.ImageRepository, k8sVersion, cfg.TargetArch)
 	if err != nil {
 		return errors.Wrap(err, "getting images")
 	}
@@ -241,7 +242,7 @@ func (r *CRIO) Preload(cfg config.KubernetesConfig) error {
 		return nil
 	}
 
-	tarballPath := download.TarballPath(k8sVersion, cRuntime)
+	tarballPath := download.TarballPath(k8sVersion, cRuntime, cfg.TargetArch)
 	targetDir := "/"
 	targetName := "preloaded.tar.lz4"
 	dest := path.Join(targetDir, targetName)

@@ -17,7 +17,10 @@ limitations under the License.
 package cmd
 
 import (
+	"runtime"
+
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	cmdConfig "k8s.io/minikube/cmd/minikube/cmd/config"
 	"k8s.io/minikube/pkg/minikube/exit"
 	"k8s.io/minikube/pkg/minikube/image"
@@ -43,11 +46,11 @@ var addCacheCmd = &cobra.Command{
 	Long:  "Add an image to local cache.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Cache and load images into docker daemon
-		if err := machine.CacheAndLoadImages(args); err != nil {
+		if err := machine.CacheAndLoadImages(args, viper.GetString("arch")); err != nil {
 			exit.Error(reason.InternalCacheLoad, "Failed to cache and load images", err)
 		}
 		// Add images to config file
-		if err := cmdConfig.AddToConfigMap(cacheImageConfigKey, args); err != nil {
+		if err := cmdConfig.AddToConfigMap(cacheImageConfigKey, args, viper.GetString("arch")); err != nil {
 			exit.Error(reason.InternalAddConfig, "Failed to update config", err)
 		}
 	},
@@ -60,7 +63,7 @@ var deleteCacheCmd = &cobra.Command{
 	Long:  "Delete an image from the local cache.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Delete images from config file
-		if err := cmdConfig.DeleteFromConfigMap(cacheImageConfigKey, args); err != nil {
+		if err := cmdConfig.DeleteFromConfigMap(cacheImageConfigKey, args, viper.GetString("arch")); err != nil {
 			exit.Error(reason.InternalDelConfig, "Failed to delete images from config", err)
 		}
 		// Delete images from cache/images directory
@@ -76,7 +79,7 @@ var reloadCacheCmd = &cobra.Command{
 	Short: "reload cached images.",
 	Long:  "reloads images previously added using the 'cache add' subcommand",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := node.CacheAndLoadImagesInConfig()
+		err := node.CacheAndLoadImagesInConfig(viper.GetString("arch"))
 		if err != nil {
 			exit.Error(reason.GuestCacheLoad, "Failed to reload cached images", err)
 		}
@@ -84,6 +87,7 @@ var reloadCacheCmd = &cobra.Command{
 }
 
 func init() {
+	cacheCmd.Flags().StringVar(&architecture, "arch", runtime.GOARCH, "target architecture for cached container")
 	cacheCmd.AddCommand(addCacheCmd)
 	cacheCmd.AddCommand(deleteCacheCmd)
 	cacheCmd.AddCommand(reloadCacheCmd)
