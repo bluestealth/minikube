@@ -26,20 +26,24 @@ cp ${BINARIES_DIR}/grub-eltorito.img ${ROOTFS_TMP_TARGET_DIR}/boot/grub/grub.img
 
 # Copy Grub2 EFI Config
 mkdir -p ${ROOTFS_TMP_TARGET_DIR}/EFI/BOOT
-cp ${BINARIES_DIR}/efi-part/EFI/BOOT/bootx64.efi  ${ROOTFS_TMP_TARGET_DIR}/EFI/BOOT/bootx64.efi
+cp ${BINARIES_DIR}/efi-part/EFI/BOOT/bootx64.efi ${ROOTFS_TMP_TARGET_DIR}/EFI/BOOT/bootx64.efi
 cp ${BOARD_DIR}/grub.cfg ${ROOTFS_TMP_TARGET_DIR}/EFI/BOOT/grub.cfg
 
-# Copy Kernal and Initramfs
+# Copy Kernel and Initramfs
 cp ${BINARIES_DIR}/bzImage ${ROOTFS_TMP_TARGET_DIR}/bzImage
 cp ${BINARIES_DIR}/rootfs.cpio.gz ${ROOTFS_TMP_TARGET_DIR}/initrd
 
 # Create CD Image
-xorriso -as mkisofs -V 'MINIKUBE' -o ${BINARIES_DIR}/rootfs.iso9660 \
--J -R -boot-load-size 4 -boot-info-table -no-emul-boot \
--e --interval:appended_partition_2:all:: \
--append_partition 2 0xef ${BINARIES_DIR}/grub-efi.img \
--b boot/grub/grub.img \
-${ROOTFS_TMP_TARGET_DIR}
+rm -f ${BINARIES_DIR}/rootfs.iso9660
+xorriso -volid 'MINIKUBE' \
+  -outdev ${BINARIES_DIR}/rootfs.iso9660 \
+  -padding 0 \
+  -map ${ROOTFS_TMP_TARGET_DIR} / \
+  -chmod 0755 / -- \
+  -boot_image grub bin_path=/boot/grub/grub.img \
+  -boot_image any next \
+  -append_partition 2 0xef ${BINARIES_DIR}/grub-efi.img \
+  -boot_image grub efi_path=--interval:appended_partition_2:all::
 
 # Cleanup
 rm -rf ${ROOTFS_TMP_TARGET_DIR}
