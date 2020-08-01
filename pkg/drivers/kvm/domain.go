@@ -46,6 +46,14 @@ const domainTmpl = `
   </features>
   {{if eq .VirtualizationType "kvm"}}
   <cpu mode='host-passthrough'/>
+  {{else if eq .Platform "aarch64"}}
+  <cpu mode="custom" match="exact" check="none">
+    <model fallback="allow">cortex-a57</model>
+  </cpu>
+  {{else if eq .Platform "x86_64"}}
+  <cpu mode="custom" match="exact" check="none">
+    <model fallback="allow">qemu64</model>
+  </cpu>
   {{end}}
   <os>
     <type arch='{{.Platform}}' machine='{{.PlatformMachine}}'>{{.PlatformType}}</type>
