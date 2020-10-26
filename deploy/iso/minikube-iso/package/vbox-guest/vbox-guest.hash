@@ -10,3 +10,6 @@ sha256 ff784417295e48e3cee80a596faf05e3b0976e1b94d3b88427939912b0c1fc45  VBoxGue
 # From http://download.virtualbox.org/virtualbox/6.1.10/SHA256SUMS
 sha256 37d8b30c0be82a50c858f3fc70cde967882239b6212bb32e138d3615b423c477  VirtualBox-6.1.10.tar.bz2
 sha256 62a0c6715bee164817a6f58858dec1d60f01fd0ae00a377a75bbf885ddbd0a61  VBoxGuestAdditions_6.1.10.iso
+# From http://download.virtualbox.org/virtualbox/6.1.16/SHA256SUMS
+sha256 49c1990da16d8a3d5bda8cdb961ec8195a901e67e4c79aea44c1521a5fc2f9f1  VirtualBox-6.1.16.tar.bz2
+sha256 88db771a5efd7c048228e5c1e0b8fba56542e9d8c1b75f7af5b0c4cf334f0584  VBoxGuestAdditions_6.1.16.iso
