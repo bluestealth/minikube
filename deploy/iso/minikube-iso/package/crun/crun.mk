@@ -4,11 +4,11 @@
 #
 ################################################################################
 
-CRUN_VERSION = 0.14.1
-CRUN_COMMIT = 88886aef25302adfd40a9335372bbc2b970c8ae5
-CRUN_LIBOCISPEC_COMMIT = 69a096a965ae47c5a83832b87e1d0a5178ca0b30
-CRUN_SITE = https://github.com/containers/crun/archive
-CRUN_SOURCE = $(CRUN_VERSION).tar.gz
+CRUN_VERSION = 0.15
+CRUN_COMMIT = 56ca95e61639510c7dbd39ff512f80f626404969
+CRUN_LIBOCISPEC_COMMIT = 5dfe2f406dc2d0f244aec621292e4e0a52149240
+CRUN_SITE = https://github.com/containers/crun/releases/download/$(CRUN_VERSION)
+CRUN_SOURCE = crun-$(CRUN_VERSION).tar.xz
 CRUN_LICENSE = GPLv2+
 CRUN_LICENSE_FILES = LICENSE
 
@@ -23,10 +23,6 @@ endif
 
 
 define CRUN_RUN_AUTOGEN
-		rmdir $(@D)/libocispec
-		git -C $(@D) init
-		git -C $(@D) submodule add https://github.com/containers/libocispec.git $(@D)/libocispec
-		git -C $(@D)/libocispec checkout $(CRUN_LIBOCISPEC_COMMIT)
         cd $(@D) && PATH=$(BR_PATH) ./autogen.sh
 endef
 
