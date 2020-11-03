@@ -4,8 +4,8 @@
 #
 ################################################################################
 
-DOCKER_AMD64_BIN_VERSION = 19.03.13
-DOCKER_AMD64_BIN_SITE = https://download.docker.com/linux/static/stable/x86_64
+DOCKER_AMD64_BIN_VERSION = 20.10.0-beta1
+DOCKER_AMD64_BIN_SITE = https://download.docker.com/linux/static/test/x86_64
 DOCKER_AMD64_BIN_SOURCE = docker-$(DOCKER_AMD64_BIN_VERSION).tgz
 
 define DOCKER_AMD64_BIN_USERS
