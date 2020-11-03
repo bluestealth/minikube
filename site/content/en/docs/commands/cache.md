@@ -13,6 +13,12 @@ Add, delete, or push a local image into minikube
 
 Add, delete, or push a local image into minikube
 
+### Options
+
+```
+      --arch string   target architecture for cached container (default "amd64")
+```
+
 ### Options inherited from parent commands
 
 ```
@@ -149,8 +155,9 @@ minikube cache list [flags]
 ### Options
 
 ```
-      --format string   Go template format string for the cache list output.  The format for Go templates can be found here: https://golang.org/pkg/text/template/
-                        For the list of accessible variables for the template, see the struct values here: https://godoc.org/k8s.io/minikube/cmd/minikube/cmd#CacheListTemplate (default "{{.CacheImage}}\n")
+      --format string                Go template format string for the cache list output.  The format for Go templates can be found here: https://golang.org/pkg/text/template/
+                                     For the list of accessible variables for the template, see the struct values here: https://godoc.org/k8s.io/minikube/cmd/minikube/cmd#CacheListTemplate (default "{{.CacheImage}}\n")
+      --target-architecture string   target architecture for cached container (default "amd64")
 ```
 
 ### Options inherited from parent commands
