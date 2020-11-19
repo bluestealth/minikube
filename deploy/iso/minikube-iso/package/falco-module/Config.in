@@ -4,3 +4,4 @@ config BR2_PACKAGE_FALCO_MODULE
 	depends on BR2_LINUX_KERNEL
 	select BR2_PACKAGE_NCURSES
 	select BR2_PACKAGE_LIBYAML
+	depends on BR2_x86_64
