@@ -249,7 +249,7 @@ minikube_iso:
 		mkdir -p $(BUILD_DIR); \
 		git clone --depth=1 --branch=$(BUILDROOT_BRANCH) https://github.com/buildroot/buildroot $(BUILD_DIR)/buildroot_$(GOARCH)_efi; \
 	fi;
-	$(MAKE) BR2_EXTERNAL=../../deploy/iso/minikube-iso minikube_${GOARCH}_efi_defconfig -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi
+	$(MAKE) GOARCH="" BR2_EXTERNAL=../../deploy/iso/minikube-iso minikube_$(GOARCH)_efi_defconfig -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi
 	mkdir -p $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build
 	echo "module buildroot.org/go" > $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/go.mod
 	$(MAKE) GOARCH="" -C $(BUILD_DIR)/buildroot_$(GOARCH)_efi
@@ -273,13 +273,13 @@ else
 endif
 	cp $(BUILD_DIR)/buildroot_$(GOARCH)_efi/output/build/linux-$(KERNEL_VERSION)/defconfig deploy/iso/minikube-iso/board/coreos-$(GOARCH)/minikube/linux_defconfig
 
-out/minikube-$(GOARCH).iso: $(shell find "deploy/iso/minikube-iso" -type f)
+out/minikube-%.iso: $(shell find "deploy/iso/minikube-iso" -type f)
 ifeq ($(IN_DOCKER),1)
-	$(MAKE) minikube_iso
+	$(MAKE) GOARCH=$* minikube_iso
 else
 	$(DOCKER) run --rm --workdir /mnt --volume $(CURDIR):/mnt $(ISO_DOCKER_EXTRA_ARGS) \
 		--user $(shell id -u):$(shell id -g) --env HOME=/tmp --env IN_DOCKER=1 \
-		$(ISO_BUILD_IMAGE) /usr/bin/make out/minikube-$(GOARCH).iso
+		$(ISO_BUILD_IMAGE) /usr/bin/make out/minikube-$*.iso
 endif
 
 iso_in_docker:
