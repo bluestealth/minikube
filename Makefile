@@ -781,7 +781,7 @@ out/docker-machine-driver-kvm2-$(RPM_VERSION)-0.%.rpm: out/docker-machine-driver
 
 .PHONY: kvm-image
 kvm-image: installers/linux/kvm/Dockerfile  ## Convenient alias to build the docker container
-	$(DOCKER) build --build-arg "GO_VERSION=$(GO_VERSION)" -t $(KVM_BUILD_IMAGE) -f $< $(dir $<)
+	$(DOCKER) build --build-arg "GO_VERSION=$(GO_VERSION)" GO_ARCH=$(GOARCH) -t $(KVM_BUILD_IMAGE) -f $< $(dir $<)
 	@echo ""
 	@echo "$(@) successfully built"
 

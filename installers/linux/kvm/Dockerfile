@@ -12,21 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/gcp-runtimes/ubuntu_16_0_4
+FROM docker.io/library/ubuntu:16.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
 		gcc \
 		libc6-dev \
 		make \
 		pkg-config \
+		ca-certificates \
 		curl \
 		libvirt-dev \
 		git \
 	&& rm -rf /var/lib/apt/lists/*
 
 ARG GO_VERSION
+ARG GO_ARCH
 
-RUN curl -sSL https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+RUN curl -sSL https://golang.org/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz | tar -C /usr/local -xzf -
 
 ENV GOPATH /go
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/go/bin
