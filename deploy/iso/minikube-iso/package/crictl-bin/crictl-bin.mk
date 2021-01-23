@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-CRICTL_BIN_VERSION = v1.19.0
+CRICTL_BIN_VERSION = v1.20.0
 CRICTL_BIN_SITE = https://github.com/kubernetes-sigs/cri-tools/releases/download/$(CRICTL_BIN_VERSION)
 
 ifeq ($(KERNEL_ARCH),x86_64)
