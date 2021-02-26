@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-DOCKER_ARM64_BIN_VERSION = 20.10.3
+DOCKER_ARM64_BIN_VERSION = 20.10.4
 DOCKER_ARM64_BIN_SITE = https://download.docker.com/linux/static/stable/aarch64
 DOCKER_ARM64_BIN_SOURCE = docker-$(DOCKER_ARM64_BIN_VERSION).tgz
 
