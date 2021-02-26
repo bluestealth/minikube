@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-GLUSTER_VERSION = 8.3
+GLUSTER_VERSION = 9.0
 GLUSTER_SITE = https://download.gluster.org/pub/gluster/glusterfs/$(shell echo $(GLUSTER_VERSION) | cut -d. -f1)/$(GLUSTER_VERSION)
 GLUSTER_SOURCE = glusterfs-$(GLUSTER_VERSION).tar.gz
 GLUSTER_CONF_OPTS = --disable-ec-dynamic --disable-georeplication --disable-gnfs --disable-cmocka --without-server
