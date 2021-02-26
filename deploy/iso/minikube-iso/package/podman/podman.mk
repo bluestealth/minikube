@@ -1,5 +1,5 @@
-PODMAN_VERSION = v2.2.1
-PODMAN_COMMIT = a0d478edea7f775b7ce32f8eb1a01e75374486cb
+PODMAN_VERSION = v3.0.1
+PODMAN_COMMIT = c640670e85c4aaaff92741691d6a854a90229d8d
 PODMAN_SITE = https://github.com/containers/podman/archive
 PODMAN_SOURCE = $(PODMAN_VERSION).tar.gz
 PODMAN_LICENSE = Apache-2.0
@@ -19,7 +19,7 @@ define PODMAN_USERS
 endef
 
 PODMAN_BUILD_TARGETS = cmd/podman
-LIBPOD = github.com/containers/podman/v2/libpod
+LIBPOD = github.com/containers/podman/v3/libpod
 PODMAN_LDFLAGS = \
 		-X $(LIBPOD)/define.gitCommit=$(PODMAN_COMMIT) \
 		-X $(LIBPOD)/define.buildInfo=$(shell date "+%s") \
