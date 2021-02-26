@@ -4,9 +4,9 @@
 #
 ################################################################################
 
-CRUN_VERSION = 0.17
-CRUN_COMMIT = 0e9229ae34caaebcb86f1fde18de3acaf18c6d9a
-CRUN_LIBOCISPEC_COMMIT = df96ab4041005d8bc491c1c1f63fedbf28caf9ee
+CRUN_VERSION = 0.18
+CRUN_COMMIT = 808420efe3dc2b44d6db9f1a3fac8361dde42a95
+CRUN_LIBOCISPEC_COMMIT = 73d8912fd36f2808f7e1e2591e4e94cb50a7554d
 CRUN_SITE = https://github.com/containers/crun/releases/download/$(CRUN_VERSION)
 CRUN_SOURCE = crun-$(CRUN_VERSION).tar.xz
 CRUN_LICENSE = GPLv2+
